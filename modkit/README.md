@@ -8,9 +8,15 @@ Pikachu, Charizard, Ditto, Snorlax, Mewtwo), so it does not depend on offsets re
 dump. Treat the first run as the real test and send back the output of `probe-personal`.
 
 ## Getting the files
-You need the extracted **RomFS** folder (and, for build checks, the `main` file from **ExeFS**). Either:
-- on a PC: unpack your dump with any NSP/XCI tool (e.g. hactool, or `dm/tools/nx_extract` in this repo, which merges the 1.3.2 update), or
-- on the phone: the app's setup writes a `RomFS` folder under `Android/data/com.nxnative.pokemonshield/files/` (look for it with a file manager).
+If the game is set up in the app, the RomFS is already unpacked (the 1.3.2 update merged in): `setup_game.py` moves it to `<game folder>/RomFS`, where
+the game folder is `Android/data/com.nxnative.pokemonshield/files/` for the first game set up, or `files/<title ID>/` for the second (Shield
+`01008DB008C2C000`, Sword `0100ABF008968000`). Setup deletes the original ExeFS afterwards, so leave out `--main`: a game that runs in the app is 1.3.2 already.
+
+Android 11 and later stop most file managers from opening `Android/data`. Ways in:
+- **USB to a PC** (Windows Explorer / macOS Android File Transfer): `Android/data` is usually visible there. Copy `RomFS/bin/pml` (the species data; small),
+  or the whole `RomFS` to run `inspect` on everything.
+- `adb pull /sdcard/Android/data/com.nxnative.pokemonshield/files/RomFS/bin/pml`.
+- Without a dump on the phone already: unpack the NSP on a PC with your keys (hactool, or `dm/tools/nx_extract`, which merges the update).
 
 ## Steps
 ```sh
