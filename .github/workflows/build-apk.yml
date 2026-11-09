@@ -1,0 +1,74 @@
+# Builds the app (GalarNative.apk) with scripts/build_apk_pc.sh and uploads it as a download on the run's page.
+# Signing: the repository secret SIGNING_KEYSTORE_B64 (a keystore, base64; alias "debug", passwords "android"). Every build must use the same key,
+# or Android refuses to install it as an update (and uninstalling deletes the set-up game), so the build stops when the secret is missing.
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ['dm/**', 'scripts/**', '.github/workflows/build-apk.yml']
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # VERSION: above the original app's 41, and higher with every build, so each installs as an update over the last
+      - name: Paths and version
+        run: |
+          echo "WORK=$RUNNER_TEMP/psa-build" >> "$GITHUB_ENV"
+          echo "VERSION=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Signing key
+        env:
+          KS_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::error::The SIGNING_KEYSTORE_B64 secret is missing (Settings > Secrets and variables > Actions). Without a fixed key, builds can't update each other."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/ks"
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks/release.keystore"
+          echo "KEYSTORE=$RUNNER_TEMP/ks/release.keystore" >> "$GITHUB_ENV"
+          keytool -list -v -keystore "$RUNNER_TEMP/ks/release.keystore" -storepass android > "$RUNNER_TEMP/ks/info.txt"
+          grep -m1 'SHA256:' "$RUNNER_TEMP/ks/info.txt"
+
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv build-essential cmake ninja-build
+
+      - name: Cache downloaded toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.WORK }}/android-ndk-r27c
+            ${{ env.WORK }}/dotnet
+            ${{ env.WORK }}/android-sdk
+            ${{ env.WORK }}/python-android
+          key: toolchains-${{ hashFiles('scripts/build_apk_pc.sh') }}
+
+      - name: Build
+        run: bash scripts/build_apk_pc.sh
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: GalarNative-v${{ env.VERSION }}
+          path: ${{ env.WORK }}/GalarNative.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          {
+            echo "### GalarNative.apk, version 0.$VERSION"
+            echo "Commit \`${GITHUB_SHA::7}\`. Download it from **Artifacts** below (a zip with the APK inside)."
+          } >> "$GITHUB_STEP_SUMMARY"

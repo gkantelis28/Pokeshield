@@ -11,6 +11,7 @@
 # Needs on the PC: git, curl, python3 (with venv), a C/C++ compiler (gcc / g++), make, and cmake + ninja unless TURNIP=0,
 #   e.g. sudo apt install git curl python3-venv build-essential cmake ninja-build   (a JDK is fetched too when none is installed)
 # The APK is signed with a debug key made on first use ($WORK/debug.keystore); keep it to install updates over a first install.
+# KEYSTORE=<file> signs with that keystore instead (alias debug, passwords "android"); VERSION=<n> sets the versionCode (default 12).
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd); A=$REPO/dm/android
 WORK=${WORK:-$HOME/psa-build}; mkdir -p "$WORK"; cd "$WORK"
@@ -99,5 +100,5 @@ else   # an earlier build's copies in $LIBS would otherwise still go into the AP
 step "8/8 the APK"
 OUT="$WORK/$(python3 "$REPO/dm/games/game.py" $GAME app_name | tr -d ' ').apk"   # GalarNative.apk / PaldeaNative.apk
 python3 "$A/tools/build_apk.py" --game $GAME --libs "$LIBS" --pylib "$PY/prefix/lib/python3.14" --capstone-py "$WORK/capstone-py/capstone" --bt "$BT" --jar "$JAR" \
-    --ks "$WORK/debug.keystore" --out "$OUT"
+    --ks "${KEYSTORE:-$WORK/debug.keystore}" ${VERSION:+--version "$VERSION"} --out "$OUT"
 echo; echo "done: $OUT (install it, open it, choose your game files and keys)"

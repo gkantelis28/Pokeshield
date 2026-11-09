@@ -74,3 +74,14 @@ On Windows without WSL, `python dm/android/tools/win_build_lib.py 01008DB008C2C0
 
 Changes to the shader translation chain (`dm/gfx/tools/dmsh_*`, the translator, the profile's shader tables) change its version: run
 `python dm/gfx/tools/dmsh_chain.py --header` with `DM_GAME=01008DB008C2C000` and rebuild the engine, so the two agree.
+
+## Building on GitHub (this fork)
+
+`.github/workflows/build-apk.yml` runs `scripts/build_apk_pc.sh` on GitHub's machines whenever `dm/`, `scripts/` or the workflow changes, or by
+hand from the Actions tab (Build APK > Run workflow). The APK is on the run's page under **Artifacts**. Each build's versionCode is 100 + the run
+number, so every build installs as an update over the last one.
+
+It signs with the repository secret `SIGNING_KEYSTORE_B64`: a keystore, base64-encoded, with alias `debug` and passwords `android` (make one with
+`keytool -genkeypair -keystore k.keystore -storepass android -keypass android -alias debug -keyalg RSA -keysize 2048 -validity 10000 -dname CN=fork`,
+then `base64 -w0 k.keystore`). The build stops without it: builds signed with different keys can't update each other, and uninstalling to switch
+deletes the set-up game. Keep a private copy of the keystore.
