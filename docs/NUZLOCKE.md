@@ -1,9 +1,19 @@
 # Nuzlocke mode: design
 
-Status: **milestone 1 written, not yet run on a phone (2026-11-11).** The ☰ Nuzlocke tab (Sword / Shield only) has the presets and every option below,
-each card tagged with what it does so far ("Partly", "Coming later"); a run locks them. Working in code: faint = dead (found and logged; you move or release the
-Pokémon yourself for now), reminders while a dead Pokémon is in the party, wipe detection (ends the run, or just logs), the status line, the death message and
-the run log. Everything else is "Coming later".
+Status: **milestones 1 and 2 written, not yet run on a phone (2026-11-11).** The ☰ Nuzlocke tab (Sword / Shield only) has the presets and every option
+below, each card tagged with what it does so far ("Partly", "Coming later"); a run locks them. Rules are enforced by telling the player (notices, the run log,
+a reminder every 2 minutes), not yet by stopping the game. Working in code:
+- faint = dead (you move or release the Pokémon yourself for now); wipe detection (ends the run, or just logs); status line, death message, run log, Graveyard.
+- every new Pokémon after the run starts (party or boxes): its area is its met location; a second catch in a used area is flagged, with the shiny clause, the
+  dupes clause (species or evolution line), raids (met location "Pokémon Den" / Max Lair: count, free, not allowed, or the only Wild Area source), hatched eggs
+  (the only gifts told apart so far), the Wild Area as one area, legendaries not allowed, and a nickname reminder. A list of the areas used is in the tab.
+- level caps and "the next Gym Leader's" party size from a badge counter the player sets in the tab (− / +): reminders when over. Caps 20 24 27 36 38 42 46 48,
+  then 65; team sizes 2 3 3 4 4 4 4 4, then 6 (public figures, the same in both games; check them against your game).
+- shinies not allowed in the party, legendaries box only: reminders.
+Not yet: failed encounters (needs the game's battle state), gifts other than eggs, which den a raid was at, weather in the Wild Area, the current area (notices on
+entering), and everything that changes the game itself (moving the dead to a box, blocking EXP / items / Gym exits, Set mode, Exp. Share).
+Area names, species names and evolution lines are read on the phone from the player's RomFS (`bin/message/<language>/script/place_name.dat`, where line N is
+met location N; `common/monsname.dat`; `bin/pml/evolution/evo_NNN.bin`, 9 entries of 8 bytes). Those formats were checked against a real Shield 1.3.2 dump.
 
 How the party is read (`dm/android/app/jni/nuzlocke.c`): no hooks and no code addresses (so no build-ID gate). The game keeps each Pokémon in the series'
 documented PK8 form (what save editors read), encrypted but self-checking, so the engine scans the game's memory for valid party-form records, takes the

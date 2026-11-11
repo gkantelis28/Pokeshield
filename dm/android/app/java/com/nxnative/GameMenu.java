@@ -457,9 +457,22 @@ public final class GameMenu {
             LinearLayout r = new LinearLayout(a); c.addView(r);
             button(a, r, t(a, "End run"), false, () -> confirm(a, t(a, "End this run? The rules unlock; the run log stays until the next run starts."), t(a, "End run"),
                 () -> { Nuzlocke.end(a, "ended", "Run ended in the menu"); go("nuzlocke"); }));
+            int bd = Nuzlocke.badges(p);   // (counted by the player: the level caps and "the next Gym Leader's" party size go by it)
+            LinearLayout bc = card(a); titleRow(a, bc, t(a, "Badges: %d", bd), null);
+            TextView bs = text(a, (bd < 8 ? t(a, "Level cap %d, the next Gym Leader has %d Pokémon.", Nuzlocke.CAPS[bd], Nuzlocke.TEAM[bd]) : t(a, "Level cap %d (the Champion).", Nuzlocke.CAPS[8]))
+                + " " + t(a, "Tap + after each Gym."), 13, SUB, false); bs.setPadding(0, dp(a, 4), 0, 0); bc.addView(bs);
+            LinearLayout br = new LinearLayout(a); bc.addView(br);
+            button(a, br, "−", false, () -> { Nuzlocke.setBadges(a, bd - 1); redraw(); }); button(a, br, "+", true, () -> { Nuzlocke.setBadges(a, bd + 1); redraw(); });
+            List<String[]> used = Nuzlocke.areas(p);
+            heading(a, t(a, "Areas used (%d)", used.size()));
+            if (used.isEmpty()) note(a, t(a, "None yet."));
+            else { StringBuilder sb = new StringBuilder();
+                for (String[] u : used) { String nm = u[0].equals("wild") ? t(a, "the Wild Area") : Nuzlocke.place(a, Integer.parseInt(u[0])); sb.append(sb.length() > 0 ? "\n" : "").append(nm).append(": ").append(u[1]); }
+                LinearLayout uc = card(a); uc.addView(text(a, sb.toString(), 12, TEXT, false)); }
             heading(a, t(a, "Graveyard (%d)", dead.size()));
             if (dead.isEmpty()) note(a, t(a, "No deaths yet."));
-            for (String[] d : dead) note(a, "✝ " + d[0] + (d.length > 2 && !d[2].isEmpty() ? " · " + t(a, "Lv. %s", d[2]) : "") + (d.length > 3 ? " · " + d[3] : ""));
+            for (String[] d : dead) note(a, "✝ " + d[0] + (d.length > 1 && !d[1].isEmpty() ? " (" + Nuzlocke.speciesName(a, Integer.parseInt(d[1])) + ")" : "")
+                + (d.length > 2 && !d[2].isEmpty() ? " · " + t(a, "Lv. %s", d[2]) : "") + (d.length > 3 ? " · " + d[3] : ""));
         } else {
             note(a, t(a, "A Nuzlocke run: a Pokémon that faints is dead, and only the first Pokémon in each area may be caught. Pick the rules, then start a run: they stay locked until it ends. Cards marked \"Coming later\" are not enforced yet."));
             if (!st.isEmpty()) note(a, t(a, "Last run: %s (%s), deaths %d.", t(a, st.equals("failed") ? "failed" : st.equals("won") ? "won" : "ended"), p.getProperty("ended", "?"), Nuzlocke.dead(p).size()));
