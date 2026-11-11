@@ -34,7 +34,7 @@ static ssize_t rd(uintptr_t a, void *b, size_t n) { struct iovec l = { b, n }, r
 static double now_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
 static uint16_t u16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
 static uint32_t u32(const uint8_t *p) { return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
-static void crypt(uint8_t *d, int n, uint32_t seed) {
+static void pk_crypt(uint8_t *d, int n, uint32_t seed) {
     for (int i = 0; i + 1 < n; i += 2) { seed = seed * 0x41C64E6Du + 0x6073u; d[i] ^= (uint8_t)(seed >> 16); d[i + 1] ^= (uint8_t)(seed >> 24); }
 }
 // the generator k steps on, as seed * A[k] + C[k]: one word of a stored record decrypted without the ones before it (the boxes' quick checks)
@@ -47,7 +47,7 @@ static uint16_t word_at(const uint8_t *p, uint32_t ec, int off) {   // the decry
 // the decrypted record (blocks in order) from its stored bytes, and its fields; 0 when the sum does not match
 static int unpack(const uint8_t *p, mon_t *m) {
     uint32_t ec = u32(p);
-    uint8_t d[STORED]; memcpy(d, p, STORED); crypt(d + 8, STORED - 8, ec);
+    uint8_t d[STORED]; memcpy(d, p, STORED); pk_crypt(d + 8, STORED - 8, ec);
     uint16_t sum = 0; for (int i = 8; i < STORED; i += 2) sum = (uint16_t)(sum + u16(d + i));
     if (sum != u16(d + 6)) return 0;
     const uint8_t *bp = BLOCKPOS[((ec >> 13) & 31) % 24];
@@ -68,7 +68,7 @@ static int unpack(const uint8_t *p, mon_t *m) {
 static int decode(const uint8_t *p, mon_t *m) {
     uint32_t ec = u32(p);
     if (!ec || p[4] || p[5]) return 0;
-    uint8_t ps[16]; memcpy(ps, p + STORED, 16); crypt(ps, 16, ec);   // the party stats first: cheap, and nearly all of memory fails here
+    uint8_t ps[16]; memcpy(ps, p + STORED, 16); pk_crypt(ps, 16, ec);   // the party stats first: cheap, and nearly all of memory fails here
     if (ps[0] < 1 || ps[0] > 100 || ps[1]) return 0;                    // level, a zero byte
     for (int i = 2; i < 14; i += 2) { uint16_t v = u16(ps + i); if (!v || v > 999) return 0; }   // max HP, Attack, Defense, Speed, Sp. Atk, Sp. Def
     if (!unpack(p, m)) return 0;
