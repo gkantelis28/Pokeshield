@@ -26,9 +26,11 @@ new Pokémon.
     starts the next build (v103+), which installs as an update over it.
 - **modkit** (`modkit/modkit.py`, pure Python, tests in `modkit/tests`): `inspect` a RomFS; `probe-personal` discovers the species table's layout
   from known species values instead of assuming offsets; `personal-dump` / `personal-edit` / `package` make a mod zip for the app's
-  Mods > Import. **Tested only on synthetic data so far.**
-- `docs/NUZLOCKE.md`: the agreed shape of Nuzlocke mode (presets, options, enforcement tiers). Design only, no code yet; the owner hasn't
-  reviewed the option list yet.
+  Mods > Import. **Works on a real Shield 1.3.2 dump, and a mod built with it worked on the phone** (the Galar starters showed Dragon as a second type).
+- **Nuzlocke mode** (`docs/NUZLOCKE.md` has the agreed options and what is built): milestones 1-2 are in code, not yet tried on the phone.
+  `dm/android/app/jni/nuzlocke.c` reads the party and the boxes from the game's memory (PK8 records, no hooks), `Nuzlocke.java` runs the rules,
+  `GameMenu.java` has the ☰ Nuzlocke tab. Build #5 (v105, milestone 1) compiled.
+- Pushing from the PC works (Git Credential Manager has the owner's GitHub login since 2026-11-11).
 
 ## Now
 The owner copied the app's data folder from the phone (build **v104** installed, game runs) to their PC at
@@ -45,12 +47,17 @@ Also fixed for Windows: `package` crashed printing "☰" when output was piped, 
 learnsets, 309,920 B = 1192 x 260), `tamagowaza/` (egg moves, 1251 files), `waza/wazaNNNN.wazabin` (827 moves, 136 B each), `item/item.dat`,
 `grow_table/` (8 EXP curves).
 
+The ground missing in the overworld after v104 was the fast setup's background shaders (upstream #173); it came back once they finished.
+Upstream fixed the order in #174 (`7d6df06`), not merged into the fork yet.
+
 Next steps, in order:
-1. The owner imports the test mod and reports back (a starter's summary should show Dragon as a second type). If it doesn't show, check the app
-   log for the `fs mount rom ... (overlay first)` line before suspecting the data.
-2. `inspect`'s candidate list is too noisy on the real RomFS (32,767 matches, mostly `item_NNNN.bntx` icons): restrict it to data extensions.
-3. Then: other tables (learnsets, evolutions, moves, encounters, trainers), text files, then Nuzlocke (go over the option list with the owner
-   first), then the species-cap research described in `modkit/README.md`.
+1. The owner tests Nuzlocke on the phone (they asked to batch the testing): Start a run in ☰ Nuzlocke; "Party watch" should say "party found";
+   then a faint, a catch, a catch sent to the boxes. If the party isn't found, read the `[nuzlocke]` lines in `Download/PokemonShield-log.txt`.
+2. Nuzlocke rules that need the game's code (disassemble `<game folder>/patched/main.patched.bin`; gate addresses on the build ID): the current
+   area (area notices, failed encounters), battle state (items in battle, failed encounters), moving the dead to a Graveyard box, blocking EXP
+   over the cap, Set mode, Gym exits. Badges are counted by hand in the tab until the game's badge flags are found.
+3. `inspect`'s candidate list is too noisy on the real RomFS (32,767 matches, mostly `item_NNNN.bntx` icons): restrict it to data extensions.
+4. Other tables (learnsets, moves, encounters, trainers), then the species-cap research described in `modkit/README.md`.
 
 ## Rules
 - **Never commit anything from the game**: no RomFS files, dumps, keys, extracted or edited game files, CSV dumps of game tables, or mod zips. Keep
