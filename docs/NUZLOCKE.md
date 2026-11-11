@@ -1,6 +1,16 @@
 # Nuzlocke mode: design
 
-Status: **design only, nothing built yet.** This page lists the options and how each would work, so they can be agreed before any code.
+Status: **milestone 1 written, not yet run on a phone (2026-11-11).** The ☰ Nuzlocke tab (Sword / Shield only) has the presets and every option below,
+each card tagged with what it does so far ("Partly", "Coming later"); a run locks them. Working in code: faint = dead (found and logged; you move or release the
+Pokémon yourself for now), reminders while a dead Pokémon is in the party, wipe detection (ends the run, or just logs), the status line, the death message and
+the run log. Everything else is "Coming later".
+
+How the party is read (`dm/android/app/jni/nuzlocke.c`): no hooks and no code addresses (so no build-ID gate). The game keeps each Pokémon in the series'
+documented PK8 form (what save editors read), encrypted but self-checking, so the engine scans the game's memory for valid party-form records, takes the
+longest run 0x158 apart as the party, and re-reads them every second; a record of a party Pokémon whose HP goes from above 0 to 0 is a faint. Known limits:
+a faint revived within the same battle is only caught if that battle's copy was picked up by a rescan (every 60 s); the first run will show in `log.txt`
+(lines starting `[nuzlocke]`) whether the party is found at all. State: `<game folder>/nuzlocke/run.properties` and `log.txt` (one run per game folder,
+not per save yet). Texts are English only so far (missing translations fall back to English).
 The owner went over the list on 2026-11-11 and added five rules (marked *new*). **Every rule beyond the basics is its own setting and optional**:
 the new ones are off in every preset and only turn on when picked (which makes the run Custom).
 

@@ -69,7 +69,7 @@ public final class GameMenu {
     private static Dialog dlg; private static Activity act; private static LinearLayout rail, body; private static ScrollView scroll; private static TextView status;
     private static String page = "display"; private static final Set<String> RESTART = new HashSet<>();   // settings changed that apply from the next start
     private static final String[][] TABS = { { "display", "Display" }, { "perf", "Performance" }, { "controls", "Controls" }, { "mods", "Mods" }, { "saves", "Saves" },
-                                             { "online", "Online" }, { "system", "System" }, { "about", "About" } };
+                                             { "nuzlocke", "Nuzlocke" }, { "online", "Online" }, { "system", "System" }, { "about", "About" } };   // (Nuzlocke: Sword / Shield only)
 
     // android_main.c: what 0 = the menu, 1 = the controller buttons
     public static void show(Activity a, int what) { a.runOnUiThread(() -> open(a, what == 1 ? "remap" : null)); }
@@ -120,6 +120,7 @@ public final class GameMenu {
         rail.removeAllViews();
         String top = p.equals("remap") ? "controls" : p.equals("driver") ? "system" : p.equals("order") ? "mods" : p;
         for (String[] tb : TABS) {
+            if (tb[0].equals("nuzlocke") && !Nuzlocke.forThisGame(a)) continue;
             boolean on = tb[0].equals(top);
             TextView r = text(a, t(a, tb[1]), 15, on ? TEXT : SUB, on); r.setPadding(dp(a, 14), dp(a, 11), dp(a, 10), dp(a, 11));
             r.setBackground(on ? round((accent(a) & 0x00FFFFFF) | 0x38000000, dp(a, 12), 0, 0) : null);
@@ -135,6 +136,7 @@ public final class GameMenu {
             case "mods": mods(a); break;
             case "order": order(a); break;
             case "saves": saves(a); break;
+            case "nuzlocke": nuzlocke(a); break;
             case "online": online(a); break;
             case "driver": driver(a); break;
             case "about": about(a); break;
@@ -162,9 +164,10 @@ public final class GameMenu {
         p.setBackground(on ? round(accent(a), dp(a, 14), 0, 0) : round(CHIP, dp(a, 14), 1, CARD_LINE)); return p;
     }
     // a choice: { value, chip label, what it does }; the chosen one's line under the chips. Applied at once when the engine can (nativeSetting), else tagged "Applies next start"
-    private static void choice(Activity a, String key, String title, String[][] opts) {
+    private static void choice(Activity a, String key, String title, String[][] opts) { choice(a, key, title, RESTART.contains(key) ? t(a, "Applies next start") : null, opts); }
+    private static void choice(Activity a, String key, String title, String tag, String[][] opts) {
         LinearLayout c = card(a); String cur = GameSettings.get(a, key);
-        titleRow(a, c, title, RESTART.contains(key) ? t(a, "Applies next start") : null);
+        titleRow(a, c, title, tag);
         HorizontalScrollView hs = new HorizontalScrollView(a); hs.setHorizontalScrollBarEnabled(false);
         LinearLayout chips = new LinearLayout(a); chips.setPadding(0, dp(a, 10), 0, dp(a, 6)); hs.addView(chips); c.addView(hs);
         TextView desc = text(a, "", 13, SUB, false); c.addView(desc);
@@ -222,6 +225,7 @@ public final class GameMenu {
     }
 
     private static void set(Activity a, String key, String value) {
+        if (key.startsWith("DM_NZ_")) { Nuzlocke.setOption(a, key, value); return; }   // (Nuzlocke rules: read by the app, not the engine; a preset sets the others)
         String was = GameSettings.get(a, key);
         GameSettings.set(a, key, value);
         boolean now;
@@ -424,10 +428,11 @@ public final class GameMenu {
         button(a, r, t(a, "Save"), true, () -> { try (FileWriter fw = new FileWriter(new File(m, "notes.txt"))) { fw.write(e.getText().toString()); } catch (IOException x) { } go("order"); });
         button(a, r, t(a, "Cancel"), false, () -> go("order"));
     }
-    private static void confirm(Activity a, String q, Runnable yes) {   // asked in a card at the top of the page, not a pop-up
+    private static void confirm(Activity a, String q, Runnable yes) { confirm(a, q, t(a, "Delete"), yes); }
+    private static void confirm(Activity a, String q, String yesLabel, Runnable yes) {   // asked in a card at the top of the page, not a pop-up
         LinearLayout c = new LinearLayout(a); c.setOrientation(LinearLayout.VERTICAL); c.setBackground(round(CARD, dp(a, 16), dp(a, 2), WARN)); c.setPadding(dp(a, 16), dp(a, 12), dp(a, 16), dp(a, 12));
         c.addView(text(a, q, 15, TEXT, true)); LinearLayout r = new LinearLayout(a); c.addView(r);
-        button(a, r, t(a, "Delete"), true, yes); button(a, r, t(a, "Cancel"), false, () -> go(page));
+        button(a, r, yesLabel, true, yes); button(a, r, t(a, "Cancel"), false, () -> go(page));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.bottomMargin = dp(a, 10); body.addView(c, 0, lp); scroll.scrollTo(0, 0);
     }
 
@@ -437,6 +442,50 @@ public final class GameMenu {
         action(a, t(a, "Export save data"), t(a, "Save in the game first: the export is the last save the game wrote."),
                () -> pick(a, Intent.ACTION_CREATE_DOCUMENT, GameSettings.game(a)[2] + "-save.zip", REQ_EXPORT));
         action(a, t(a, "Import save data"), t(a, "Your current save is kept as a backup."), () -> pick(a, Intent.ACTION_OPEN_DOCUMENT, null, REQ_IMPORT));
+    }
+    // Nuzlocke mode (Nuzlocke.java, docs/NUZLOCKE.md): no run on: the presets and every rule, each card tagged with what it does so far, and Start; a run on: its
+    // deaths, the Graveyard, the run log, the locked rules, and End. Mods' "off for local play" applies here too
+    private static String nzTag(Activity a, int status) { return status == Nuzlocke.ON ? null : t(a, status == Nuzlocke.PARTLY ? "Partly" : "Coming later"); }
+    private static void nuzlocke(Activity a) {
+        java.util.Properties p = Nuzlocke.load(a); String st = p.getProperty("state", "");
+        if (st.equals("on")) {
+            heading(a, t(a, "Run"));
+            LinearLayout c = card(a); titleRow(a, c, t(a, "Run in progress"), null);
+            List<String[]> dead = Nuzlocke.dead(p);
+            TextView s = text(a, t(a, "Started %s · deaths %d", p.getProperty("started", "?"), dead.size()) + "\n" + t(a, "Party watch: %s",
+                Nuzlocke.engineState.isEmpty() ? t(a, "starting") : Nuzlocke.engineState), 13, SUB, false); s.setPadding(0, dp(a, 4), 0, 0); c.addView(s);
+            LinearLayout r = new LinearLayout(a); c.addView(r);
+            button(a, r, t(a, "End run"), false, () -> confirm(a, t(a, "End this run? The rules unlock; the run log stays until the next run starts."), t(a, "End run"),
+                () -> { Nuzlocke.end(a, "ended", "Run ended in the menu"); go("nuzlocke"); }));
+            heading(a, t(a, "Graveyard (%d)", dead.size()));
+            if (dead.isEmpty()) note(a, t(a, "No deaths yet."));
+            for (String[] d : dead) note(a, "✝ " + d[0] + (d.length > 2 && !d[2].isEmpty() ? " · " + t(a, "Lv. %s", d[2]) : "") + (d.length > 3 ? " · " + d[3] : ""));
+        } else {
+            note(a, t(a, "A Nuzlocke run: a Pokémon that faints is dead, and only the first Pokémon in each area may be caught. Pick the rules, then start a run: they stay locked until it ends. Cards marked \"Coming later\" are not enforced yet."));
+            if (!st.isEmpty()) note(a, t(a, "Last run: %s (%s), deaths %d.", t(a, st.equals("failed") ? "failed" : st.equals("won") ? "won" : "ended"), p.getProperty("ended", "?"), Nuzlocke.dead(p).size()));
+            LinearLayout r = new LinearLayout(a); body.addView(r);
+            button(a, r, t(a, "Start a run"), true, () -> confirm(a, t(a, "Start a Nuzlocke run with these rules? They stay locked until the run ends, and the last run's log is cleared."),
+                t(a, "Start"), () -> { Nuzlocke.start(a); go("nuzlocke"); }));
+            heading(a, t(a, "Preset"));
+            String[][] pr = new String[Nuzlocke.PRESETS.length][]; for (int i = 0; i < pr.length; i++) pr[i] = new String[] { Nuzlocke.PRESETS[i][0], t(a, Nuzlocke.PRESETS[i][1]), t(a, Nuzlocke.PRESETS[i][2]) };
+            choice(a, "DM_NZ_PRESET", t(a, "Preset"), null, pr);
+            String group = "";
+            for (Nuzlocke.Opt o : Nuzlocke.OPTS) {
+                if (!o.group.equals(group)) { group = o.group; heading(a, t(a, group)); }
+                String[][] ch = new String[o.ch.length][]; for (int i = 0; i < ch.length; i++) ch[i] = new String[] { o.ch[i][0], t(a, o.ch[i][1]), o.ch[i][2].isEmpty() ? "" : t(a, o.ch[i][2]) };
+                choice(a, o.key, t(a, o.title), nzTag(a, o.status), ch);
+            }
+        }
+        heading(a, t(a, "Run log"));
+        List<String> lines = Nuzlocke.logLines(a, 60);
+        if (lines.isEmpty()) note(a, t(a, "Nothing yet.")); else { LinearLayout c = card(a); c.addView(text(a, String.join("\n", lines), 12, TEXT, false)); }
+        if (st.equals("on")) {
+            heading(a, t(a, "Rules (locked for this run)"));
+            StringBuilder sb = new StringBuilder(t(a, "Preset") + ": " + t(a, Nuzlocke.label(Nuzlocke.PRESETS, Nuzlocke.rule(p, "DM_NZ_PRESET"))));
+            for (Nuzlocke.Opt o : Nuzlocke.OPTS) { String tg = nzTag(a, o.status);
+                sb.append("\n").append(t(a, o.title)).append(": ").append(t(a, Nuzlocke.label(o.ch, Nuzlocke.rule(p, o.key)))).append(tg == null ? "" : "  (" + tg + ")"); }
+            LinearLayout c = card(a); c.addView(text(a, sb.toString(), 12, SUB, false));
+        }
     }
     // Online room (hle_relay.c, dm/server): local play with players elsewhere through a room server someone hosts (their own Railway service, or any PC); everyone enters the
     // same server address and room code. Applies from the next start; mods stay off for local play, as on Wi-Fi

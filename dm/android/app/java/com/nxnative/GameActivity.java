@@ -36,6 +36,7 @@ public final class GameActivity extends NativeActivity implements InputManager.I
         liveShaders();
         handheld();
         if (GameSettings.get(this, "DM_PERF_OVERLAY").equals("on")) perfOverlay(true);
+        Nuzlocke.attach(this);   // (Sword / Shield: watches the party while a Nuzlocke run is on)
     }
     // ---------- rumble (hle_hid.c → touch_ui.c dm_rumble): the game's motor strength 0..1, about every 100 ms while it lasts, on the engine's haptic thread ----------
     // the controller's own motor when the one in use has one, else the phone's (DM_RUMBLE: "" both, "pad" controllers only, "off" none); each call is a 150 ms pulse
