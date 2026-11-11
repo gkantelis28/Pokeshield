@@ -1,6 +1,8 @@
 # Nuzlocke mode: design
 
 Status: **design only, nothing built yet.** This page lists the options and how each would work, so they can be agreed before any code.
+The owner went over the list on 2026-11-11 and added five rules (marked *new*). **Every rule beyond the basics is its own setting and optional**:
+the new ones are off in every preset and only turn on when picked (which makes the run Custom).
 
 ## Where it lives
 - A new **Nuzlocke** tab in the in-game settings panel (☰), next to Mods and Saves, built with the panel's existing chip rows (`GameMenu.choice`).
@@ -26,7 +28,7 @@ Status: **design only, nothing built yet.** This page lists the options and how 
 | When a Pokémon faints | Dead: move it to the Graveyard box · Dead: release it (asks to confirm the rule at run start) · Dead: keep it, but it can't be put in the party |
 | First encounter only | Per area · Off (catch anything; deaths still count) |
 | The Wild Area counts as | One area per zone · One area in total · One area per zone and weather |
-| Max Raid Battles | Count as the area's encounter · Free (don't use up the area) · Not allowed |
+| Max Raid Battles | Count as the area's encounter · Free (don't use up the area) · Not allowed · *new:* The only encounter source in the Wild Area (wild catches there are blocked) |
 | Gifts and fixed encounters (starter, fossils, gift Pokémon, legendaries) | Count as the area's encounter · Free · Not allowed |
 | Failed encounters (the wild one fled, fainted, or you ran away) | Use up the area · Retry allowed |
 | Nicknames | Required (asks at every catch) · Optional |
@@ -45,11 +47,13 @@ Status: **design only, nothing built yet.** This page lists the options and how 
 | Level caps (the next Gym Leader's ace) | Off · Soft (no EXP above the cap) · Hard (no EXP, and a Pokémon above it can't enter battle) |
 | Exp. Share (always on in Sword / Shield) | Game default · Off |
 | Exp. Candy | Allowed · Up to the level cap · Not allowed |
-| Items in battle | Allowed · Limited to N per battle (1-5) · Not allowed |
+| Items in battle | Allowed · Limited to N per battle (1-5) · Not allowed · *new:* Only what the enemy trainer carries (the items in that trainer's data, as many times as they have them; none in wild battles) |
+| *new:* Battle style | Game default · Locked to Set (the game's own Options setting, held on Set for the run) |
+| *new:* Gyms | Free to leave · Can't leave until the Gym Leader is beaten (the exit is blocked, with a message) |
 | Held items | Allowed · Berries only · Not allowed |
 | Healing outside battle (Pokémon Centers, healing items, camp curry) | Allowed · Limited per area · Not allowed |
 | Dynamax / Gigantamax | Allowed · Gym battles only · Not allowed |
-| Party size | 6 · 5 · 4 · 3 · 2 · 1 |
+| Party size | 6 · 5 · 4 · 3 · 2 · 1 · *new:* Match the next Gym Leader (their team size) |
 
 ### End of the run
 | Option | Choices |
@@ -86,7 +90,16 @@ in `dm/tools/` (`nso2elf.py`, `sdis.py`). No game code is committed: only addres
 - The party, the boxes and the Pokémon record layout (per-Pokémon HP, species, nickname, level). Save-editing tools already document most of the record layout.
 - The current area / location ID, plus a table mapping IDs to names for the area list.
 - The functions that run when a Pokémon faints, when a wild battle starts and ends (with its result), on a catch, and on EXP gain.
-- The trainer and Gym Leader data, for the level caps (from the RomFS, read with `modkit`).
+- The trainer and Gym Leader data, for the level caps and "match the next Gym Leader" (team sizes), and each trainer's battle items for "only
+  what the enemy trainer carries" (from the RomFS, read with `modkit`), plus which trainer the current battle is against.
+- The Battle Style option in the game's settings (to hold it on Set), the Gym interiors' area IDs and the exit warps out of them (to block leaving),
+  and the item-use path in battle (to count and limit items).
+
+The game's code is available for this: the app keeps its unpacked, patched copy at `<game folder>/patched/main.patched.bin` (setup deletes only
+the original ExeFS). Check first that addresses found in it match the original 1.3.2 layout before relying on them.
+
+Difficulty of the *new* rules: Set mode, raids-only and Gym team size are small additions to existing options; leaving a Gym needs the exit
+blocked (blocking tier); trainer-item limits are the most work (trainer item data, the current opponent, and a check on every item use), so they come last.
 
 ## Open questions
 - Release on death: the release itself needs a hook on the game's box code. Moving to a Graveyard box needs free box space, so what happens when it's full?
