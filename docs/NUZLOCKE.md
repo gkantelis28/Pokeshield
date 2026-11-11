@@ -101,6 +101,11 @@ the original ExeFS). Check first that addresses found in it match the original 1
 Difficulty of the *new* rules: Set mode, raids-only and Gym team size are small additions to existing options; leaving a Gym needs the exit
 blocked (blocking tier); trainer-item limits are the most work (trainer item data, the current opponent, and a check on every item use), so they come last.
 
+## Decided (2026-11-11)
+- When the Graveyard box is full, the dead go to another Graveyard box (Graveyard 2, 3, ...).
+- Standard stays the default preset.
+
 ## Open questions
-- Release on death: the release itself needs a hook on the game's box code. Moving to a Graveyard box needs free box space, so what happens when it's full?
+- Release on death: the release itself needs a hook on the game's box code.
+- When every box is full, there is no box left for a new Graveyard (warn, and keep the dead Pokémon out of the party until there's space?).
 - The Wild Area options need the zone IDs mapped, which comes from the RomFS once it can be read.
