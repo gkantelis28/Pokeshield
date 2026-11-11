@@ -40,6 +40,7 @@ import java.util.Set;
 public final class Nuzlocke {
     private Nuzlocke() { }
     private static native String nativePoll();
+    private static native void nativeHoldSet(boolean on);
 
     // ---------- the rules ----------
     static final int ON = 0, PARTLY = 1, LATER = 2;
@@ -78,7 +79,7 @@ public final class Nuzlocke {
         new Opt("Clauses", "DM_NZ_LEGEND", "Legendary / Mythical", PARTLY, new String[][] {
             { "", "Allowed", "" }, { "box", "Box only", "Reminded while one is in the party" }, { "none", "Not allowed", "A catch is flagged" } }),
         new Opt("Difficulty", "DM_NZ_LEVELCAP", "Level caps", PARTLY, new String[][] {
-            { "", "Off", "" }, { "soft", "Soft", "No EXP above the next Gym Leader's ace. For now you're reminded when a Pokémon is over the cap (count your badges in this tab)" },
+            { "", "Off", "" }, { "soft", "Soft", "No EXP above the next Gym Leader's ace. For now you're reminded when a Pokémon is over the cap (badges are read from the game on Shield 1.3.2; elsewhere count them in this tab)" },
             { "hard", "Hard", "No EXP above the cap, and a Pokémon above it can't battle. For now you're reminded when one is over it" } }),
         new Opt("Difficulty", "DM_NZ_EXPSHARE", "Exp. Share", LATER, new String[][] { { "", "Game default", "Always on, as in the game" }, { "off", "Off", "" } }),
         new Opt("Difficulty", "DM_NZ_CANDY", "Exp. Candy", LATER, new String[][] { { "", "Allowed", "" }, { "cap", "Up to the cap", "" }, { "none", "Not allowed", "" } }),
@@ -89,13 +90,14 @@ public final class Nuzlocke {
         new Opt("Difficulty", "DM_NZ_HEAL", "Healing outside battle", LATER, new String[][] {
             { "", "Allowed", "Pokémon Centers, healing items, camp curry" }, { "limited", "Limited per area", "" }, { "none", "Not allowed", "" } }),
         new Opt("Difficulty", "DM_NZ_DYNAMAX", "Dynamax / Gigantamax", LATER, new String[][] { { "", "Allowed", "" }, { "gyms", "Gyms only", "" }, { "none", "Not allowed", "" } }),
-        new Opt("Difficulty", "DM_NZ_STYLE", "Battle style", LATER, new String[][] { { "", "Game default", "" }, { "set", "Locked to Set", "The game's Set mode, held for the run" } }),
+        new Opt("Difficulty", "DM_NZ_STYLE", "Battle style", ON, new String[][] { { "", "Game default", "" },
+            { "set", "Locked to Set", "The game's own Battle Style option is held on Set for the run (switching it back in Options doesn't stay). Shield 1.3.2 only so far" } }),
         new Opt("Difficulty", "DM_NZ_GYMS", "Gyms", LATER, new String[][] {
             { "", "Free to leave", "" }, { "locked", "Can't leave", "A Gym can't be left until its Leader is beaten" } }),
         new Opt("Difficulty", "DM_NZ_PARTY", "Party size", PARTLY, new String[][] {
             { "", "6", "" }, { "5", "5", "Reminded while the party is bigger" }, { "4", "4", "Reminded while the party is bigger" }, { "3", "3", "Reminded while the party is bigger" },
             { "2", "2", "Reminded while the party is bigger" }, { "1", "1", "Reminded while the party is bigger" },
-            { "gym", "Next Gym Leader's", "As many as the next Gym Leader has (count your badges in this tab); reminded while the party is bigger" } }),
+            { "gym", "Next Gym Leader's", "As many as the next Gym Leader has (by your badges); reminded while the party is bigger" } }),
         new Opt("End of the run", "DM_NZ_WIPE", "Whole party fainted (wipe)", PARTLY, new String[][] {
             { "", "Run ends", "The run ends, marked failed (the save stays playable)" }, { "lives", "Lives", "Lose a life (coming later: logged for now)" }, { "log", "Just logged", "" } }),
         new Opt("End of the run", "DM_NZ_SECOND", "Second chances", LATER, new String[][] { { "", "None", "" }, { "token", "Revive token per badge", "" } }),
@@ -234,6 +236,7 @@ public final class Nuzlocke {
         p.setProperty("badges", String.valueOf(n)); save(c, p); log(c, "Badges: " + n);
     }
     static volatile String engineState = "";   // what the engine last said about the party (the menu shows it)
+    static volatile int gameBadges = -1, gameStyle = -1;   // read from the game (Shield 1.3.2); -1 = not known (another build, or not found yet): badges are counted by hand
 
     // ---------- while playing ----------
     private static volatile Activity act; private static Thread watcher;
@@ -249,11 +252,12 @@ public final class Nuzlocke {
         for (;;) {
             try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
             Activity a = act; if (a == null) continue;
-            if (!active(a)) { status(a, null); continue; }
-            String r; try { r = nativePoll(); } catch (UnsatisfiedLinkError e) { return; }
-            List<String[]> party = new ArrayList<>(), fresh = new ArrayList<>(); List<String> faints = new ArrayList<>(); boolean scanned = false;
+            if (!active(a)) { status(a, null); try { nativeHoldSet(false); } catch (UnsatisfiedLinkError e) { return; } continue; }
+            String r; try { nativeHoldSet("set".equals(rule(load(a), "DM_NZ_STYLE"))); r = nativePoll(); } catch (UnsatisfiedLinkError e) { return; }
+            List<String[]> party = new ArrayList<>(), fresh = new ArrayList<>(); List<String> faints = new ArrayList<>(); boolean scanned = false; int got = -1;
             for (String ln : r.split("\n")) { String[] f = ln.split("\t", -1);
                 if (f[0].equals("S") && f.length > 1) engineState = f[1];
+                else if (f[0].equals("G") && f.length > 3) { got = f[1].equals("-1") ? -1 : num(f, 1); gameBadges = got; gameStyle = f[3].equals("-1") ? -1 : num(f, 3); }
                 else if (f[0].equals("P") && f.length > 12) { party.add(f); fresh.add(f); }
                 else if (f[0].equals("N") && f.length > 12) fresh.add(f);
                 else if (f[0].equals("F") && f.length > 1) faints.add(f[1]);
@@ -262,6 +266,12 @@ public final class Nuzlocke {
             synchronized (Nuzlocke.class) {
                 Properties p = load(a); if (!"on".equals(p.getProperty("state"))) continue;
                 boolean changed = false, baseline = !"done".equals(p.getProperty("baseline"));
+                if (got >= 0 && got != badges(p)) {   // the game's own badges (Shield 1.3.2): they replace the hand count
+                    boolean earned = got > badges(p) && !baseline;   // (not the badges already held when the run started)
+                    log(a, earned ? T.t(a, "Badge earned: %d (read from the game)", got) : T.t(a, "Badges: %d (read from the game)", got));
+                    p.setProperty("badges", String.valueOf(got)); changed = true;
+                    if (earned && !rule(p, "DM_NZ_LEVELCAP").isEmpty()) notices.add(new String[] { T.t(a, "Badge %d! The level cap is now %d.", got, CAPS[Math.min(8, got)]), "" });
+                }
                 // new Pokémon: before the first full scan of a run, what the player already had; after it, catches (and gifts, eggs, raids)
                 for (String[] m : fresh) { if (num(m, 12) == 1 || p.containsKey("seen." + m[1])) continue;
                     p.setProperty("seen." + m[1], m[6]); changed = true;

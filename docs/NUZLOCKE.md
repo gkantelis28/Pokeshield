@@ -1,6 +1,6 @@
 # Nuzlocke mode: design
 
-Status: **milestones 1 and 2 written, not yet run on a phone (2026-11-11).** The ☰ Nuzlocke tab (Sword / Shield only) has the presets and every option
+Status: **milestones 1-3 written, not yet run on a phone (2026-11-11).** The ☰ Nuzlocke tab (Sword / Shield only) has the presets and every option
 below, each card tagged with what it does so far ("Partly", "Coming later"); a run locks them. Rules are enforced by telling the player (notices, the run log,
 a reminder every 2 minutes), not yet by stopping the game. Working in code:
 - faint = dead (you move or release the Pokémon yourself for now); wipe detection (ends the run, or just logs); status line, death message, run log, Graveyard.
@@ -10,6 +10,10 @@ a reminder every 2 minutes), not yet by stopping the game. Working in code:
 - level caps and "the next Gym Leader's" party size from a badge counter the player sets in the tab (− / +): reminders when over. Caps 20 24 27 36 38 42 46 48,
   then 65; team sizes 2 3 3 4 4 4 4 4, then 6 (public figures, the same in both games; check them against your game).
 - shinies not allowed in the party, legendaries box only: reminders.
+- **milestone 3 (Shield 1.3.2 only, gated on main's build ID):** the badges are read from the game (the counter in the tab then says "Read from the game" and
+  has no − / +; a new badge is logged, with a notice of the new cap), and "Battle style: Locked to Set" holds the game's own Battle Style option on Set (the
+  engine sets it back each second when it finds Switch). Other builds (Sword, other versions): badges counted by hand, no Set lock. How the two game objects
+  were found is below ("Found in the game's code").
 Not yet: failed encounters (needs the game's battle state), gifts other than eggs, which den a raid was at, weather in the Wild Area, the current area (notices on
 entering), and everything that changes the game itself (moving the dead to a box, blocking EXP / items / Gym exits, Set mode, Exp. Share).
 Area names, species names and evolution lines are read on the phone from the player's RomFS (`bin/message/<language>/script/place_name.dat`, where line N is
@@ -120,6 +124,19 @@ the original ExeFS). Check first that addresses found in it match the original 1
 
 Difficulty of the *new* rules: Set mode, raids-only and Gym team size are small additions to existing options; leaving a Gym needs the exit
 blocked (blocking tier); trainer-item limits are the most work (trainer item data, the current opponent, and a check on every item use), so they come last.
+
+## Found in the game's code (Shield 1.3.2, main build `a16802625e7826bf83b6f9708e475b91`)
+Found in `<game folder>/patched/main.patched.bin` (offsets from main's start; the patched copy keeps the original layout for these). The save is a list of
+blocks keyed by a 32-bit hash (save editors document the keys); the game copies the blocks it uses into objects of its own on load and back on save, so the
+live values are in those objects, not in the save data:
+- **Misc** (key `0x1b882b09`): constructor `0x14386a0` (heap, 0x298 bytes), load `0x14389d0`, save `0x1438b30`. Class tables written at +0 / +0x48 / +0x50:
+  `0x25a9968` / `0x25a99d0` / `0x25a9a10` (base + offset at run time: the class-table slot is the relocated GOT entry `0x262a9f0` → `0x25a9958`, + 0x10 / 0x78 / 0xb8).
+  The block's 0x21c bytes are at +0x60: byte 0 = badges, one bit per Gym; money at +4.
+- **Options**: constructor `0x140d120`, load `0x140d730`, save `0x140d410` (one block per setting: `0x92eb0306` text speed, `0xccc153cd` battle effects,
+  `0x765468c3` battle style, ...). Class tables `0x25a8780` / `0x25a87e0` / `0x25a8820` (GOT `0x262a818` → `0x25a8770`). One word at +0x60, the settings as
+  bits: 0-1 text speed, 2 battle effects, **3 battle style (0 Switch, the constructor's default; 1 Set)**.
+The engine finds both objects by those three pointers during its memory scan (`nuzlocke.c`, `k_rows`); no game code is changed. Sword's main has its own build
+ID and wasn't checked (no dump), so Sword gets no row yet.
 
 ## Decided (2026-11-11)
 - When the Graveyard box is full, the dead go to another Graveyard box (Graveyard 2, 3, ...).

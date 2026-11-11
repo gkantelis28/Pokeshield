@@ -58,7 +58,7 @@ $(OUT)/objl/touch_ui.o: app/jni/touch_ui.c $(GFXD)/nvn/nvn_ovl.h
 	@mkdir -p $(dir $@); $(CC) $(CFLAGS) -I$(GFXD)/nvn -c $< -o $@
 $(OUT)/objl/touch_menu.o: app/jni/touch_menu.c $(GAME_H)
 	@mkdir -p $(dir $@); $(CC) $(CFLAGS) -c $< -o $@
-$(OUT)/objl/nuzlocke.o: app/jni/nuzlocke.c
+$(OUT)/objl/nuzlocke.o: app/jni/nuzlocke.c $(GAME_H)
 	@mkdir -p $(dir $@); $(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/objl/glue.o: $(GLUE)/android_native_app_glue.c
 	@mkdir -p $(dir $@); $(CC) -O2 -fPIC -I$(GLUE) -c $< -o $@

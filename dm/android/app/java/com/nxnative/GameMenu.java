@@ -457,12 +457,13 @@ public final class GameMenu {
             LinearLayout r = new LinearLayout(a); c.addView(r);
             button(a, r, t(a, "End run"), false, () -> confirm(a, t(a, "End this run? The rules unlock; the run log stays until the next run starts."), t(a, "End run"),
                 () -> { Nuzlocke.end(a, "ended", "Run ended in the menu"); go("nuzlocke"); }));
-            int bd = Nuzlocke.badges(p);   // (counted by the player: the level caps and "the next Gym Leader's" party size go by it)
+            int bd = Nuzlocke.badges(p);   // (the level caps and "the next Gym Leader's" party size go by it: read from the game on Shield 1.3.2, else counted by the player)
+            boolean auto = Nuzlocke.gameBadges >= 0;
             LinearLayout bc = card(a); titleRow(a, bc, t(a, "Badges: %d", bd), null);
             TextView bs = text(a, (bd < 8 ? t(a, "Level cap %d, the next Gym Leader has %d Pokémon.", Nuzlocke.CAPS[bd], Nuzlocke.TEAM[bd]) : t(a, "Level cap %d (the Champion).", Nuzlocke.CAPS[8]))
-                + " " + t(a, "Tap + after each Gym."), 13, SUB, false); bs.setPadding(0, dp(a, 4), 0, 0); bc.addView(bs);
-            LinearLayout br = new LinearLayout(a); bc.addView(br);
-            button(a, br, "−", false, () -> { Nuzlocke.setBadges(a, bd - 1); redraw(); }); button(a, br, "+", true, () -> { Nuzlocke.setBadges(a, bd + 1); redraw(); });
+                + " " + (auto ? t(a, "Read from the game.") : t(a, "Tap + after each Gym.")), 13, SUB, false); bs.setPadding(0, dp(a, 4), 0, 0); bc.addView(bs);
+            if (!auto) { LinearLayout br = new LinearLayout(a); bc.addView(br);
+                button(a, br, "−", false, () -> { Nuzlocke.setBadges(a, bd - 1); redraw(); }); button(a, br, "+", true, () -> { Nuzlocke.setBadges(a, bd + 1); redraw(); }); }
             List<String[]> used = Nuzlocke.areas(p);
             heading(a, t(a, "Areas used (%d)", used.size()));
             if (used.isEmpty()) note(a, t(a, "None yet."));

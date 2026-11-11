@@ -27,7 +27,10 @@ new Pokémon.
 - **modkit** (`modkit/modkit.py`, pure Python, tests in `modkit/tests`): `inspect` a RomFS; `probe-personal` discovers the species table's layout
   from known species values instead of assuming offsets; `personal-dump` / `personal-edit` / `package` make a mod zip for the app's
   Mods > Import. **Works on a real Shield 1.3.2 dump, and a mod built with it worked on the phone** (the Galar starters showed Dragon as a second type).
-- **Nuzlocke mode** (`docs/NUZLOCKE.md` has the agreed options and what is built): milestones 1-2 are in code, not yet tried on the phone.
+- **Nuzlocke mode** (`docs/NUZLOCKE.md` has the agreed options and what is built): milestones 1-3 are in code, not yet tried on the phone.
+  Milestone 3 (Shield 1.3.2 only) reads the badges from the game and holds the Battle Style option on Set; the addresses and how they were found are in
+  NUZLOCKE.md, "Found in the game's code". Tools used (local, not in the repo): a venv at `local/venv` with capstone, small scripts that search main for
+  `movz/movk` key loads, `adrp` references and relocations.
   `dm/android/app/jni/nuzlocke.c` reads the party and the boxes from the game's memory (PK8 records, no hooks), `Nuzlocke.java` runs the rules,
   `GameMenu.java` has the ☰ Nuzlocke tab. Build #5 (v105, milestone 1) compiled.
 - Pushing from the PC works (Git Credential Manager has the owner's GitHub login since 2026-11-11).
@@ -52,10 +55,12 @@ Upstream fixed the order in #174 (`7d6df06`), not merged into the fork yet.
 
 Next steps, in order:
 1. The owner tests Nuzlocke on the phone (they asked to batch the testing): Start a run in ☰ Nuzlocke; "Party watch" should say "party found";
-   then a faint, a catch, a catch sent to the boxes. If the party isn't found, read the `[nuzlocke]` lines in `Download/PokemonShield-log.txt`.
+   then a faint, a catch, a catch sent to the boxes; the Badges card should say "Read from the game"; with Battle style "Locked to Set", Options should
+   show Set. If something isn't found, read the `[nuzlocke]` lines in `Download/PokemonShield-log.txt` ("game objects: Misc ... Options ...").
 2. Nuzlocke rules that need the game's code (disassemble `<game folder>/patched/main.patched.bin`; gate addresses on the build ID): the current
    area (area notices, failed encounters), battle state (items in battle, failed encounters), moving the dead to a Graveyard box, blocking EXP
-   over the cap, Set mode, Gym exits. Badges are counted by hand in the tab until the game's badge flags are found.
+   over the cap, Gym exits. The save editors' block keys (PKHeX `SaveBlockAccessor8SWSH.cs`) are the way in: find the code that loads a block's key,
+   and the object it copies the block into.
 3. `inspect`'s candidate list is too noisy on the real RomFS (32,767 matches, mostly `item_NNNN.bntx` icons): restrict it to data extensions.
 4. Other tables (learnsets, moves, encounters, trainers), then the species-cap research described in `modkit/README.md`.
 
