@@ -30,3 +30,7 @@ shaders.pak
 bin/
 dm/android/spirv_cross/src/
 dm/android/spirv_cross/out/
+# This fork: the app's data folder copied off the phone, and local work (modkit outputs, mod zips): made from the game, never committed
+com.nxnative.*/
+local/
+*.zip
