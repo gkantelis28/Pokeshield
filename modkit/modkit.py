@@ -51,6 +51,10 @@ def sha(path, limit=None):
                 if left <= 0: break
     return h.hexdigest()
 
+def read_json(path):
+    # utf-8-sig: Notepad and PowerShell on Windows start UTF-8 files with a byte order mark, which plain json.load rejects
+    with open(path, encoding='utf-8-sig') as f: return json.load(f)
+
 def human(n):
     for u in ('B', 'KB', 'MB', 'GB'):
         if n < 1024 or u == 'GB': return f'{n:.0f} {u}' if u == 'B' else f'{n:.1f} {u}'
@@ -207,7 +211,7 @@ def cmd_probe(a):
     return 0
 
 def load_layout(path):
-    lay = json.load(open(path))
+    lay = read_json(path)
     for k in ('entry_size', 'base', 'index_shift', 'fields'):
         if k not in lay: die(f'{path}: layout missing "{k}"')
     return lay
@@ -258,14 +262,14 @@ def cmd_edit(a):
     data = open(src, 'rb').read()
     if lay.get('source_sha256') and lay['source_sha256'] != hashlib.sha256(data).hexdigest():
         print('warning: this file differs from the one the layout was probed on (different game version, or already edited)', file=sys.stderr)
-    edits = json.load(open(a.edits))
+    edits = read_json(a.edits)
     new, log = apply_edits(data, lay, edits.get('species', edits))
     print('\n'.join(log) or 'no changes')
     if a.dry_run or not log: return
     dst = os.path.join(a.out, 'romfs', a.file)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     open(dst, 'wb').write(new)
-    with open(os.path.join(a.out, 'readme.txt'), 'w') as f:
+    with open(os.path.join(a.out, 'readme.txt'), 'w', encoding='utf-8') as f:
         f.write(f'{a.name}\nBuilt by modkit from a personal copy of the game. {len(log)} edit(s) to {a.file}.\nFor Pokémon Sword / Shield 1.3.2 in Galar Native. Mods must be off for local play.\n')
     print(f'wrote {dst} and readme.txt; zip it with: modkit.py package {a.out} <name>.zip')
 
@@ -283,6 +287,10 @@ def cmd_package(a):
     print(f'{a.zip}: {n} files. On the phone: Settings (☰) > Mods > Import a mod (.zip)')
 
 def main():
+    # Windows: when output is piped, Python uses the ANSI code page, which has no "☰" or "é"; print a "?" instead of crashing.
+    for s in (sys.stdout, sys.stderr):
+        try: s.reconfigure(errors='replace')
+        except (AttributeError, ValueError): pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest='cmd', required=True)
     p = sp.add_parser('inspect'); p.add_argument('romfs'); p.add_argument('--main', help='ExeFS/main (an NSO) to read the build ID from')

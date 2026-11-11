@@ -1,0 +1,58 @@
+{
+ "fields": {
+  "hp": {
+   "offset": 0,
+   "size": 1
+  },
+  "atk": {
+   "offset": 1,
+   "size": 1
+  },
+  "def": {
+   "offset": 2,
+   "size": 1
+  },
+  "spe": {
+   "offset": 3,
+   "size": 1
+  },
+  "spa": {
+   "offset": 4,
+   "size": 1
+  },
+  "spd": {
+   "offset": 5,
+   "size": 1
+  },
+  "type1": {
+   "offset": 6,
+   "size": 1
+  },
+  "type2": {
+   "offset": 7,
+   "size": 1
+  },
+  "catch_rate": {
+   "offset": 8,
+   "size": 1
+  },
+  "ability1": {
+   "offset": 24,
+   "size": 2
+  }
+ },
+ "notes": {},
+ "stat_order": [
+  "hp",
+  "atk",
+  "def",
+  "spe",
+  "spa",
+  "spd"
+ ],
+ "entry_size": 176,
+ "base": 0,
+ "index_shift": 0,
+ "count": 1192,
+ "source_sha256": "a1d7fbee6a2c729d5bd9e26241c76cf12f961aa0468d060894d225e59ae7a8ac"
+}

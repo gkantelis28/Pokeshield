@@ -31,17 +31,25 @@ new Pokémon.
   reviewed the option list yet.
 
 ## Now
-The owner copied the app's data folder `Android/data/com.nxnative.pokemonshield/` from the phone to their PC. The unpacked game (1.3.2 update
-merged in) is at `com.nxnative.pokemonshield/files/RomFS`, or `files/<title ID>/RomFS` for a second game (Shield `01008DB008C2C000`, Sword
-`0100ABF008968000`). The original ExeFS is not kept (setup deletes it), so modkit's `--main` doesn't apply.
+The owner copied the app's data folder from the phone (build **v104** installed, game runs) to their PC at
+`<user folder>\Downloads\pokemonshield_backup\com.nxnative.pokemonshield\` (the game is **Shield**; RomFS at `files\RomFS`, 50,494 files,
+12.1 GB). The original ExeFS is not kept (setup deletes it), so modkit's `--main` doesn't apply. The repo is cloned at `D:\Pokeshield`, with
+local work in `D:\Pokeshield\local\` (gitignored).
+
+**2026-11-11: the species table works on the real dump.** `probe-personal` found the layout first time (see `modkit/README.md` and
+`modkit/layouts/`), the CSV dump matches known values for species the probe didn't use, and a test mod (`local/StartersDragonTest.zip`: the nine
+Galar starter-line records get Dragon as type 2, exactly 9 bytes changed) was built for the owner to import. **Not yet confirmed on the phone.**
+Also fixed for Windows: `package` crashed printing "☰" when output was piped, and JSON written by Notepad / PowerShell (byte order mark) was rejected.
+
+`bin/pml` also holds: `evolution/evo_NNN.bin` (1192 files of 72 bytes, one per personal record), `waza_oboe/wazaoboe_total.bin` (level-up
+learnsets, 309,920 B = 1192 x 260), `tamagowaza/` (egg moves, 1251 files), `waza/wazaNNNN.wazabin` (827 moves, 136 B each), `item/item.dat`,
+`grow_table/` (8 EXP curves).
 
 Next steps, in order:
-1. **Ask the owner where that folder is** and which game it is. Don't search their disk.
-2. Run `python modkit/modkit.py inspect <RomFS>`, then `probe-personal` on the table it lists (likely `bin/pml/personal/personal_total.bin`).
-3. If the probe finds a layout: dump to CSV, sanity-check a few species, then make one small visible edit (e.g. a starter's stats or types), package
-   it, and have the owner import it on the phone to prove the whole pipeline. If the probe fails: work out the real format (FlatBuffer? inside a
-   `.gfpak`? compressed?) from the bytes and extend modkit, with tests built from synthetic data.
-4. Then: other tables (learnsets, evolutions, moves, encounters, trainers), text files, then Nuzlocke (go over the option list with the owner
+1. The owner imports the test mod and reports back (a starter's summary should show Dragon as a second type). If it doesn't show, check the app
+   log for the `fs mount rom ... (overlay first)` line before suspecting the data.
+2. `inspect`'s candidate list is too noisy on the real RomFS (32,767 matches, mostly `item_NNNN.bntx` icons): restrict it to data extensions.
+3. Then: other tables (learnsets, evolutions, moves, encounters, trainers), text files, then Nuzlocke (go over the option list with the owner
    first), then the species-cap research described in `modkit/README.md`.
 
 ## Rules

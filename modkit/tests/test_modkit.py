@@ -70,7 +70,8 @@ class Cli(unittest.TestCase):
             p = os.path.join(t, 'RomFS', rel); os.makedirs(os.path.dirname(p))
             open(p, 'wb').write(make_table())
             lay = os.path.join(t, 'lay.json'); ed = os.path.join(t, 'ed.json'); out = os.path.join(t, 'mod'); z = os.path.join(t, 'm.zip')
-            json.dump({'species': {'1': {'stats': [1, 2, 3, 4, 5, 6]}}}, open(ed, 'w'))
+            with open(ed, 'w', encoding='utf-8-sig') as f:   # with a byte order mark, as Notepad / PowerShell write it
+                json.dump({'species': {'1': {'stats': [1, 2, 3, 4, 5, 6]}}}, f)
             run = lambda *a: modkit.sys.argv.__setitem__(slice(None), ['modkit'] + list(a)) or self._main()
             self.assertEqual(run('probe-personal', p, '--out', lay), 0)
             self.assertEqual(run('personal-edit', '--romfs', os.path.join(t, 'RomFS'), '--file', rel, '--layout', lay, '--edits', ed, '--out', out), 0)
@@ -83,6 +84,35 @@ class Cli(unittest.TestCase):
         try: modkit.main()
         except SystemExit as e: return e.code or 0
         return 0
+
+    def test_package_prints_on_a_non_utf8_console(self):
+        # Windows with output piped: stdout is cp1252, which has no "☰"; package used to crash there after writing the zip
+        import io
+        with tempfile.TemporaryDirectory() as t:
+            os.makedirs(os.path.join(t, 'mod', 'romfs')); open(os.path.join(t, 'mod', 'romfs', 'f'), 'wb').close()
+            buf = io.BytesIO(); old = sys.stdout; w = io.TextIOWrapper(buf, encoding='cp1252')
+            sys.stdout = w
+            try:
+                modkit.sys.argv[:] = ['modkit', 'package', os.path.join(t, 'mod'), os.path.join(t, 'm.zip')]
+                code = self._main(); w.flush(); out = buf.getvalue()
+            finally: sys.stdout = old; w.detach()
+            self.assertEqual(code, 0)
+            self.assertIn(b'Mods > Import', out)
+
+class RealShape(unittest.TestCase):
+    # Synthetic data in the shape found in Shield 1.3.2's bin/pml/personal/personal_total.bin (offsets only, values made up apart from KNOWN):
+    # 1192 records of 0xB0, no header, record N = species N, stats at 0 in the order hp atk def spe spa spd, types at 6, catch rate at 8, ability at 0x18
+    def test_probe_finds_the_shield_layout(self):
+        rnd = random.Random(7); size, count = 0xB0, 1192
+        data = bytearray(rnd.randrange(256) for _ in range(size * count))
+        for dex, (_, stats, types, catch, ab) in modkit.KNOWN.items():
+            o = dex * size
+            for i, st in enumerate(['hp', 'atk', 'def', 'spe', 'spa', 'spd']): data[o + i] = stats[modkit.STAT_NAMES.index(st)]
+            data[o + 6], data[o + 7] = types; data[o + 8] = catch; data[o + 0x18:o + 0x1A] = ab.to_bytes(2, 'little')
+        l = modkit.probe(bytes(data))[0]
+        self.assertEqual((l['entry_size'], l['base'], l['index_shift'], l['count']), (size, 0, 0, count))
+        self.assertEqual({k: v['offset'] for k, v in l['fields'].items()},
+                         {'hp': 0, 'atk': 1, 'def': 2, 'spe': 3, 'spa': 4, 'spd': 5, 'type1': 6, 'type2': 7, 'catch_rate': 8, 'ability1': 0x18})
 
 class Inspect(unittest.TestCase):
     def test_nso_module_id_and_inspect(self):

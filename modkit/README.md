@@ -3,9 +3,13 @@
 Tools for making Galar Native mods from your own Sword / Shield dump. Pure Python 3, no dependencies. Nothing from the game is stored here:
 every command reads your extracted files and writes only to the folder you name.
 
-**Status: tested on synthetic data only.** The species-table reader finds its layout by looking for species with well-known values (Bulbasaur,
-Pikachu, Charizard, Ditto, Snorlax, Mewtwo), so it does not depend on offsets remembered from elsewhere, but it has not yet been run on a real
-dump. Treat the first run as the real test and send back the output of `probe-personal`.
+**Status: species table works on a real Shield 1.3.2 dump (2026-11-11).** The species-table reader finds its layout by looking for species with
+well-known values (Bulbasaur, Pikachu, Charizard, Ditto, Snorlax, Mewtwo), so it does not depend on offsets remembered from elsewhere. On Shield
+1.3.2, `bin/pml/personal/personal_total.bin` is 1192 records of 0xB0 bytes with no header; record N is national dex N (0 is empty), forms
+follow from 899. Stats are at 0-5 in the order hp atk def spe spa spd, types at 6-7, catch rate at 8, the first ability at 0x18 (2 bytes). The
+probed layout is in `layouts/shield-1.3.2-personal_total.json` (offsets and the file's hash only), and you can pass it as `--layout` directly.
+Spot checks on species the probe did not use (Venusaur, Gengar, Garchomp, the Galar starters, Dragapult, Eternatus, Calyrex) all matched.
+Sword is untested (probably the same layout; run `probe-personal` and compare).
 
 ## Getting the files
 If the game is set up in the app, the RomFS is already unpacked (the 1.3.2 update merged in): `setup_game.py` moves it to `<game folder>/RomFS`, where
