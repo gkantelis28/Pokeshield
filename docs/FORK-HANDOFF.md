@@ -1,6 +1,6 @@
 # Pokeshield fork: handoff
 
-State as of 2026-11-11. Read this first when picking the work up in a new Claude Code session.
+State as of 2026-11-11 (after the upstream merge). Read this first when picking the work up in a new Claude Code session.
 
 ## What this is
 `gkantelis28/Pokeshield` is a fork of **Galar Native** (formerly PKShield). It runs Pokémon Sword / Shield 1.3.2 natively on Android from the
@@ -8,11 +8,12 @@ player's own dump: the game's ARM64 code runs in-process and NVN graphics run on
 data mods first, then a built-in **Nuzlocke mode** with many options in the in-game ☰ settings, and eventually **raising the species cap** to add
 new Pokémon.
 
-- **Upstream is gone.** `simipoB/Galar-Native-Android` stopped being public on 2026-11-09 (deleted, made private, or taken down; unknown which).
-  This fork's first commit is an unmodified snapshot of upstream at `be5b6d3` (2026-11-06).
-- `drglitchyphd/Galar-Native-Android` (a third party's modified fork) still holds **21 newer upstream commits** by SimipoB (2026-11-08/09: Mali
-  driver fixes, faster texture uploads, a setup speedup, "Setup: no hours lost after the translation"). Merging those, without that person's own
-  17 commits, is an open decision for the owner. They can't be verified against the original any more, so review the diff before merging.
+- **Upstream:** `simipoB/Galar-Native-Android` (MIT until 2026-11-10, **GPL-3.0-or-later** since; older code keeps its MIT notice in
+  `LICENSE-MIT`). It went offline 2026-11-09 and came back 2026-11-11 with its history intact (the author said it was down for updates).
+  The fork started as a copy of upstream at `be5b6d3` (2026-11-06) and **merged upstream `28dbd0b` on 2026-11-11**, which also linked the
+  two histories. To update: `git remote add upstream https://github.com/simipoB/Galar-Native-Android` (once), then
+  `git fetch upstream && git merge upstream/main`. Upstream has no `.github/`, so the fork's workflow is unaffected; check
+  `scripts/build_apk_pc.sh` and `dm/android/tools/build_apk.py` for new build requirements after each merge.
 - Branch: `ccr-7cb96f97-hmwl2e` is the only branch (so it's the default). No PR exists because there's no other branch to compare against.
 
 ## Done
@@ -21,7 +22,8 @@ new Pokémon.
   - Signed with the repo secret `SIGNING_KEYSTORE_B64` (alias `debug`, passwords `android`). The certificate SHA-256 ends in `…37:BE:4A`.
     The owner holds the keystore privately. Never commit or print it.
   - versionCode = 100 + run number, so each build updates over the last. Package `com.nxnative.pokemonshield` (unchanged from upstream).
-  - Run #2 (v102) built and is **installed on the owner's phone (a Samsung), and the game runs.**
+  - Run #2 (v102, the pre-merge code) built and is **installed on the owner's phone (a Samsung), and the game runs.** The merge's push
+    starts the next build (v103+), which installs as an update over it.
 - **modkit** (`modkit/modkit.py`, pure Python, tests in `modkit/tests`): `inspect` a RomFS; `probe-personal` discovers the species table's layout
   from known species values instead of assuming offsets; `personal-dump` / `personal-edit` / `package` make a mod zip for the app's
   Mods > Import. **Tested only on synthetic data so far.**
