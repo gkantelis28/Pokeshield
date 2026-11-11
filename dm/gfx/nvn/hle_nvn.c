@@ -170,6 +170,10 @@ NVN(nvnDeviceInstallDebugCallback, void, NVNdevice *d, const PFNNVNDEBUGCALLBACK
 }
 NVN(nvnDeviceSetWindowOriginMode, void, NVNdevice *d, NVNwindowOriginMode m) { ((dev_t_ *)d)->origin = m; mtl_set_origin_lower_left(m == NVN_WINDOW_ORIGIN_MODE_LOWER_LEFT); LOG("[nvn] window origin %s", m ? "upper left (as D3D / Metal)" : "lower left (GL)"); }
 NVN(nvnDeviceSetDepthMode, void, NVNdevice *d, NVNdepthMode m) { ((dev_t_ *)d)->depth_mode = m; mtl_set_depth_zero(m != 0); LOG("[nvn] depth mode %s", m ? "near=0 (as D3D / Metal)" : "near=-w (GL)"); }
+// The modes as set (nvnDeviceInitialize: NVN's defaults, lower left and near=-w); Sword / Shield read both back at start (they were unimplemented: 0, which happens to be
+//   each default, so nothing went wrong yet; a game that switched first and read back would have got the wrong one)
+NVN(nvnDeviceGetWindowOriginMode, NVNwindowOriginMode, const NVNdevice *d) { return ((const dev_t_ *)d)->origin; }
+NVN(nvnDeviceGetDepthMode, NVNdepthMode, const NVNdevice *d) { return ((const dev_t_ *)d)->depth_mode; }
 NVN(nvnDeviceFinalizeCommandHandle, void, NVNdevice *d, NVNcommandHandle h) { (void)d; (void)h; }
 
 // ---------- Memory pools ----------
@@ -1197,9 +1201,16 @@ NVN(nvnWindowInitialize, NVNboolean, NVNwindow *w, const NVNwindowBuilder *b) {
         o->ntex ? (int)CTX(o->tex[0])->d.width : 0, o->ntex ? (int)CTX(o->tex[0])->d.height : 0, o->ntex ? CTX(o->tex[0])->d.format : 0);
     return 1;
 }
-// DM_NVN_REPORT_INTERVAL=<n> (test): the interval the game reads back, whatever the window presents at. With Sword / Shield's 60 fps patch the window runs at
-//   interval 1 while the game's logic stays in its 30 fps mode (the step from the interval table); code that reads the interval back sees 1 (the stadium crowd?)
-static int report_interval(int real) { static int r = -1; if (r < 0) { const char *e = getenv("DM_NVN_REPORT_INTERVAL"); r = e ? atoi(e) : 0; } return r > 0 ? r : real; }
+// The interval the game reads back. With Sword / Shield's 60 fps patch the window runs at interval 1 while each frame is held 1 or 2 slots of 60 Hz (vstep_tick):
+//   the game is told the hold in use (reported_hold), as the game itself sets 2 at 30 fps. The stadium crowd's flipbook flickered whenever a frame was held 2 slots
+//   while the game read 1 (79 jumps in 160 frames); reading a fixed 2 cut that to 12, the frames then held 1 slot. DM_NVN_REPORT_INTERVAL=<n> (test): always n;
+//   =0: the window's own interval, as before
+static int reported_hold(void);
+static int report_interval(int real) {
+    static int r = -1; if (r < 0) { const char *e = getenv("DM_NVN_REPORT_INTERVAL"); r = e ? atoi(e) : 1000; }
+    if (r > 0 && r < 1000) return r;
+    int k = r == 1000 ? reported_hold() : 0; return k > 0 ? k : real;
+}
 NVN(nvnWindowGetPresentInterval, int, const NVNwindow *w) { return report_interval(((const win_t *)w)->interval); }   // Link's Awakening reads it back every frame
 NVN(nvnWindowSetPresentInterval, void, NVNwindow *w, int v) { if (((win_t *)w)->interval != v) LOG("[nvn] the game sets present interval %d → %d", ((win_t *)w)->interval, v); ((win_t *)w)->interval = v; }
 NVN(nvnWindowSetCrop, void, NVNwindow *w, int x, int y, int ww, int hh) {
@@ -1487,6 +1498,7 @@ static _Atomic uint64_t g_itv2_since;   // start of the game's current run of in
 // (fstep_tick, nvn_fstep.h) and presents follow the hold k it decides with it
 __attribute__((weak)) uint8_t *dm_fps_state;   // loader.c; graphics unit tests have no loader
 __attribute__((weak)) void dm_fps_lock_tick(void) {}   // hle_fpslock.c: engine frame limits in game memory (Monster Hunter Rise); graphics unit tests have no host
+__attribute__((weak)) void dm_res_scale_tick(void) {}   // hle_resscale.c: an engine's 3D render scale in game memory, capped by the front end (Pokémon Sword / Shield)
 static int fps_step_cap(void) {
     if (!dm_fps_state) return 0;
     uint32_t b = __atomic_load_n((uint32_t *)dm_fps_state, __ATOMIC_RELAXED); float t; memcpy(&t, &b, sizeof t);
@@ -1497,7 +1509,11 @@ static nvn_fstep g_fs;   // present thread only
 static _Atomic int g_fs_k;   // the hold presentation follows (0 = not decided yet)
 // Shield's high frame rate (loader.c fps_patch, DM_FPS_TARGET): the same controller with slots of 1 / dm_step_hz, the step going into the game's own step word
 __attribute__((weak)) int dm_step_hz; __attribute__((weak)) uint8_t *dm_step_word;   // graphics unit tests have no loader
+__attribute__((weak)) int dm_fps_live;   // loader.c: the live target, 30 or 60 (0: not live); the menu changes it while playing
 static int vstep_on(void) { return &dm_step_hz && dm_step_hz > 0 && &dm_step_word && dm_step_word && !dm_detclock_enabled(); }
+static int live_fps(void) { return &dm_fps_live ? __atomic_load_n(&dm_fps_live, __ATOMIC_RELAXED) : 0; }
+// the hold in use (report_interval): at 60 Hz slots only, where a slot is the Switch's own vsync and the hold is the interval the game would set itself
+static int reported_hold(void) { return vstep_on() && dm_step_hz == 60 ? atomic_load(&g_fs_k) : 0; }
 // Scarlet / Violet's built-in Dynamic FPS (loader.c dm_dynfps): the game steps by the time each frame took, so only presentation is paced, in whole vsyncs of 60 Hz
 __attribute__((weak)) int dm_dynfps;
 static int dyn_on(void) { return &dm_dynfps && dm_dynfps; }
@@ -1580,8 +1596,8 @@ static void vstep_tick(const win_t *o) {
     //   (Sword on a Galaxy S25+: 3 ms of work a frame, held at 30 fps for the whole run)
     { extern _Atomic uint64_t g_nvn_game_work_ns; double w = atomic_load(&g_nvn_game_work_ns) / v; if (w > 0 && w < cpu) cpu = w; }
     double cost = cpu > gpu ? cpu : gpu;
-    // at most 2 slots: 30 fps is the floor, 60 when frames fit (a 3-slot hold, 20 fps, swung the picture between 20 and 60)
-    int k0 = g_vs.k, n = nvn_fstep_next(&g_vs, shown, cost, 1, 2, 0);
+    // at most 2 slots: 30 fps is the floor, 60 when frames fit (a 3-slot hold, 20 fps, swung the picture between 20 and 60). The live target 30 holds every frame 2
+    int k0 = g_vs.k, n = nvn_fstep_next(&g_vs, shown, cost, live_fps() == 30 ? 2 : 1, 2, 0);
     uint32_t ns = (uint32_t)(((uint64_t)n * 1000000000ull + (uint64_t)dm_step_hz - 1) / (uint64_t)dm_step_hz);
     dm_guest_write_prepare(dm_step_word, 4); __atomic_store_n((uint32_t *)dm_step_word, ns, __ATOMIC_RELAXED);
     atomic_store(&g_fs_k, g_vs.k); held[g_vs.k]++;
@@ -1607,7 +1623,7 @@ static void dyn_tick(const win_t *o) {
 }
 NVN(nvnQueuePresentTexture, void, NVNqueue *q, NVNwindow *w, int idx) {
     (void)q; win_t *o = (win_t *)w; o->presents++;
-    dm_fps_lock_tick();
+    dm_fps_lock_tick(); dm_res_scale_tick();
     if (dm_fps_state) { static int was; int c = fps_step_cap(); if (c != was) { LOG("[nvn] frame step cap %d → %d fps at present %llu%s", was, c, (unsigned long long)o->presents, c == 30 && was == 60 ? " (prerendered movie)" : ""); was = c; } }
     if (fstep_on()) fstep_tick(o); else if (vstep_on()) vstep_tick(o); else if (dyn_on()) dyn_tick(o);
     static uint64_t prev_in, prev_out, prev_pass, prev_draw;
@@ -1619,7 +1635,10 @@ NVN(nvnQueuePresentTexture, void, NVNqueue *q, NVNwindow *w, int idx) {
     }
     gfx_enter();
     uint64_t t0 = now_ns();
-    { extern _Atomic uint64_t g_nvn_game_work_ns; if (prev_out) atomic_store(&g_nvn_game_work_ns, t0 - prev_out); }
+    { extern _Atomic uint64_t g_nvn_game_work_ns, g_nvn_game_work_avg_ns;
+      if (prev_out) { uint64_t w = t0 - prev_out, a = atomic_load(&g_nvn_game_work_avg_ns); atomic_store(&g_nvn_game_work_ns, w);
+          if (w > 500000000ull) w = 500000000ull;   // (a load or a pause: counted as half a second, so one stall does not swamp the average)
+          atomic_store(&g_nvn_game_work_avg_ns, a ? a + (uint64_t)(((int64_t)w - (int64_t)a) / 16) : w); } }   // (the average over about 16 frames: the fps guard's CPU test)
     if (idx >= 0 && idx < o->ntex && idx < 4) {
         if (rq_on()) { rq_item it = { .kind = RQ_PRESENT, .o = o, .idx = idx, .period = present_period(o) / 1e9 }; memcpy(it.crop, o->crop, sizeof it.crop); gfx_leave(); rq_push(it); gfx_enter(); }
         else { o->ticket[idx] = mtl_present(CTX(o->tex[idx]), present_period(o) / 1e9, o->crop); o->pfence[idx] = mtl_last_fence(); }   // enqueue only, return immediately

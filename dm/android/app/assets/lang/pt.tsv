@@ -9,7 +9,7 @@
 30 fps, as the game is made	30 fps, como o jogo foi feito
 60 fps (experimental: needs a fast phone)	60 fps (experimental: precisa de um celular rápido)
 Adaptive	Adaptativo
-Adaptive: High, Low while the phone is hot	Adaptativo: Alto, Baixo enquanto o celular estiver quente
+Adaptive: High, a lighter picture while the phone is hot or slow	Adaptativo: Alto, imagem mais leve enquanto o celular estiver quente ou lento
 Add %s to the home screen	Adicionar %s à tela inicial
 Adding %d shader(s) the game made last time...	Adicionando %d shader(s) que o jogo criou da última vez...
 Allow access to all files so the app can read your dump where it is (it is several GB; nothing is copied).	Permita o acesso a todos os arquivos para o app ler seu dump onde ele está (são vários GB; nada é copiado).
@@ -87,6 +87,8 @@ Load order: higher wins	Ordem de carregamento: o de cima vence
 Local play is back on this Wi-Fi from the next start.	O jogo local volta para esta Wi-Fi a partir do próximo início.
 Low	Baixo
 Low: handheld mode, 720p, lighter	Baixo: modo portátil, 720p, mais leve
+Lowest	Mínimo
+Lowest: handheld mode, 3D at 960x540, coolest	Mínimo: modo portátil, 3D em 960x540, o mais fresco
 Mali driver (PanVK) options	Opções do driver Mali (PanVK)
 Memory	Memória
 Mod "%s" installed (%d files). It is used from the next start.	Mod "%s" instalado (%d arquivos). Será usado a partir do próximo início.
@@ -262,3 +264,48 @@ Auto: on with ARM's driver (v0.52)	Auto: ligado com o driver da ARM (v0.52)
 Off: the shaders as before v0.52	Desligado: os shaders como antes da v0.52
 Merge render passes	Unir passagens de renderização
 Off: every render target change starts a new pass	Desligado: cada mudança de alvo de renderização inicia uma nova passagem
+Close	Fechar
+Choose a driver	Escolher um driver
+Start anyway	Iniciar mesmo assim
+A recent Mesa Turnip package for Adreno usually fixes this: choose its .zip as the graphics driver.	Um pacote recente do Mesa Turnip para Adreno costuma resolver isso: escolha o .zip dele como driver gráfico.
+FristOneRR's PanVK driver supports this Mali: download its .zip from the developer's GitHub Releases and choose it as the graphics driver.	O driver PanVK do FristOneRR é compatível com esta Mali: baixe o .zip dele nos GitHub Releases do desenvolvedor e escolha-o como driver gráfico.
+No replacement driver supports this GPU yet. Please report it with the log in Download (the -log-previous.txt file), so the app can be fixed for it.	Ainda não há driver alternativo para esta GPU. Informe isso com o log em Download (o arquivo -log-previous.txt) para que o app possa ser corrigido para ela.
+Faster rendering (experimental)	Renderização mais rápida (experimental)
+On: the graphics work runs on its own thread, next to the game's. Not tested on every phone yet: if the game misbehaves, turn it off and tell us on GitHub	Ligado: o trabalho gráfico roda na própria thread, ao lado da do jogo. Ainda não foi testado em todos os celulares: se o jogo der problema, desligue e avise no GitHub
+Freed %s GB left over from an earlier setup.	Foram liberados %s GB que sobraram de uma configuração anterior.
+Min / max as on the Switch	Mín / máx como no Switch
+Auto: on with ARM's driver (v0.57)	Auto: ligado com o driver da ARM (v0.57)
+Off: the shaders as before v0.57	Desligado: os shaders como antes da v0.57
+About	Sobre
+Official build	Versão oficial
+Unofficial build	Versão não oficial
+Signed with the %s release key.	Assinada com a chave de lançamento do %s.
+This copy was not signed by the %s project (signer %s). It may have been changed.	Esta cópia não foi assinada pelo projeto %s (assinante %s). Ela pode ter sido modificada.
+Official downloads: %s	Downloads oficiais: %s
+Credits	Créditos
+Free software under the GNU GPL, version 3 or later (older parts also MIT). This notice must stay with every copy, and the source of every release is public.	Software livre sob a licença GNU GPL, versão 3 ou posterior (as partes mais antigas também MIT). Este aviso deve acompanhar cada cópia, e o código-fonte de cada versão é público.
+Show the license	Ver a licença
+Third-party code	Código de terceiros
+Vibrate on press	Vibrar ao tocar
+Like rumble	Igual à vibração
+Like rumble: off when Rumble is Off	Igual à vibração: desligado quando a vibração está desligada
+HD textures	Texturas HD
+Auto: on for this phone	Auto: ligado neste celular
+Auto: off for this phone (HD texture mods need 12 GB of memory)	Auto: desligado neste celular (mods de texturas HD precisam de 12 GB de memória)
+On: your HD texture mods load (more memory, slower area loads)	Ligado: seus mods de texturas HD são carregados (mais memória, carregamento de áreas mais lento)
+Off: the game's own textures (your HD texture mods stay installed)	Desligado: as texturas originais do jogo (seus mods de texturas HD continuam instalados)
+L3 / R3 buttons	Botões L3 / R3
+Off: no L3 / R3 on screen (a controller's stick buttons still work)	Desligado: sem L3 / R3 na tela (os botões dos analógicos de um controle continuam funcionando)
+On: L3 and R3 above the sticks (move them with Move the touch controls)	Ligado: L3 e R3 acima dos analógicos (mova-os com Mover os controles de toque)
+Frame generation (experimental)	Geração de quadros (experimental)
+On: a picture is made between each two of the game's frames, so 30 fps moves like 60. Needs a fast GPU; your input shows about 17 ms later	Ativada: uma imagem é criada entre cada dois quadros do jogo, então 30 fps se movem como 60. Precisa de uma GPU rápida; seus comandos aparecem cerca de 17 ms depois
+Lossless Scaling: the in-between picture made by your own copy of Lossless Scaling's frame generation (sharper motion, needs a faster GPU)	Lossless Scaling: a imagem intermediária é criada pela sua própria cópia da geração de quadros do Lossless Scaling (movimento mais nítido, precisa de uma GPU mais rápida)
+Own Lossless Scaling? Import its Lossless.dll (in the program's folder) to use its frame generation here.	Tem o Lossless Scaling? Importe o Lossless.dll dele (na pasta do programa) para usar a geração de quadros dele aqui.
+Import Lossless.dll	Importar Lossless.dll
+Lossless Scaling imported. Choose it under Frame generation.	Lossless Scaling importado. Escolha-o em Geração de quadros.
+Could not import Lossless Scaling: %s	Não foi possível importar o Lossless Scaling: %s
+Lossless Scaling pictures	Imagens do Lossless Scaling
+Auto: 4x on a 120 Hz screen, 3x on 90 Hz, else 2x (at 30 fps)	Auto: 4x numa tela de 120 Hz, 3x em 90 Hz, senão 2x (a 30 fps)
+2x: one picture between each two of the game's frames (30 fps moves like 60)	2x: uma imagem entre cada dois quadros do jogo (30 fps se movem como 60)
+3x: two pictures between each two frames (like 90 fps; even on a 90 Hz screen only)	3x: duas imagens entre cada dois quadros (como 90 fps; uniforme só numa tela de 90 Hz)
+4x: three pictures between each two frames (like 120 fps; needs a 120 Hz screen and a fast GPU)	4x: três imagens entre cada dois quadros (como 120 fps; precisa de uma tela de 120 Hz e uma GPU rápida)

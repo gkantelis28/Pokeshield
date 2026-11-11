@@ -48,6 +48,7 @@ public final class GameMenu {
     private GameMenu() { }
     private static native boolean nativeSetting(String key, String value);
     private static native void nativeEditTouch();
+    private static native String nativeLsfgImport(byte[] dll, String dir);   // lsfg_import.cpp: null when done, else why not
 
     // ---------- look ----------
     private static final int BG = 0xF0121419, CARD = 0xFF1C1F26, CARD_LINE = 0xFF2A2E37, TEXT = 0xFFF2F3F5, SUB = 0xFF9AA0AB, CHIP = 0xFF262A33, WARN = 0xFFFFB74D;
@@ -68,7 +69,7 @@ public final class GameMenu {
     private static Dialog dlg; private static Activity act; private static LinearLayout rail, body; private static ScrollView scroll; private static TextView status;
     private static String page = "display"; private static final Set<String> RESTART = new HashSet<>();   // settings changed that apply from the next start
     private static final String[][] TABS = { { "display", "Display" }, { "perf", "Performance" }, { "controls", "Controls" }, { "mods", "Mods" }, { "saves", "Saves" },
-                                             { "online", "Online" }, { "system", "System" } };
+                                             { "online", "Online" }, { "system", "System" }, { "about", "About" } };
 
     // android_main.c: what 0 = the menu, 1 = the controller buttons
     public static void show(Activity a, int what) { a.runOnUiThread(() -> open(a, what == 1 ? "remap" : null)); }
@@ -136,6 +137,7 @@ public final class GameMenu {
             case "saves": saves(a); break;
             case "online": online(a); break;
             case "driver": driver(a); break;
+            case "about": about(a); break;
             default: system(a);
         }
     }
@@ -225,7 +227,10 @@ public final class GameMenu {
         boolean now;
         if (key.equals("DM_PERF_OVERLAY")) { if (a instanceof GameActivity) ((GameActivity) a).perfOverlay(value.equals("on")); now = true; }
         else if (key.equals("DM_LANG")) now = true;
-        else if (key.equals("DM_RUMBLE")) now = !value.equals("off") && !was.equals("off");   // (controller / phone: at once; off and back on: the game's motors, from the next start)
+        else if (key.equals("DM_RUMBLE")) {   // (controller / phone: at once; off and back on: the game's motors, from the next start)
+            now = !value.equals("off") && !was.equals("off");
+            try { nativeSetting(key, value); } catch (UnsatisfiedLinkError e) { }   // (the touch buttons' click follows Rumble unless set apart: touch_ui.c)
+        }
         else { try { now = nativeSetting(key, value); } catch (UnsatisfiedLinkError e) { now = false; } }
         if (!now) RESTART.add(key);
     }
@@ -239,6 +244,31 @@ public final class GameMenu {
         choice(a, "DM_SCALER", t(a, "Upscaling"), new String[][] { { "", t(a, "Auto"), t(a, "Auto: this phone gets %s", rec) },
             { "sharp", t(a, "Sharp"), t(a, "Sharp: the picture upscaled with sharpening (lighter settings keep their detail)") },
             { "sgsr", "SGSR", t(a, "Snapdragon Game Super Resolution (Qualcomm's upscaler)") }, { "smooth", t(a, "Smooth"), t(a, "Smooth: a plain stretch") } });
+        // Frame generation (nvn_vk.c, nvn_fgen.h): off unless the player turns it on, on any GPU; takes effect at once
+        //   Lossless Scaling's (nvn_lsfg.h): offered once the player has imported their own Lossless.dll (its shaders, converted, in files/lsfg)
+        String[][] fgc = { { "", t(a, "Off"), "" },
+            { "on", t(a, "On"), t(a, "On: a picture is made between each two of the game's frames, so 30 fps moves like 60. Needs a fast GPU; your input shows about 17 ms later") },
+            { "lsfg", "Lossless Scaling", t(a, "Lossless Scaling: the in-between picture made by your own copy of Lossless Scaling's frame generation (sharper motion, needs a faster GPU)") } };
+        choice(a, "DM_FRAMEGEN", t(a, "Frame generation (experimental)"), GameSettings.hasLsfg(a) ? fgc : java.util.Arrays.copyOf(fgc, 2));
+        if (GameSettings.hasLsfg(a))   // Lossless Scaling's pictures a game frame (nvn_vk.c lsfg_mult); Auto: as many as the display's rate divides evenly
+            choice(a, "DM_LSFG_MULT", t(a, "Lossless Scaling pictures"), new String[][] {
+                { "", t(a, "Auto"), t(a, "Auto: 4x on a 120 Hz screen, 3x on 90 Hz, else 2x (at 30 fps)") },
+                { "2", "2x", t(a, "2x: one picture between each two of the game's frames (30 fps moves like 60)") },
+                { "3", "3x", t(a, "3x: two pictures between each two frames (like 90 fps; even on a 90 Hz screen only)") },
+                { "4", "4x", t(a, "4x: three pictures between each two frames (like 120 fps; needs a 120 Hz screen and a fast GPU)") } });
+        if (!GameSettings.hasLsfg(a)) {   // (the player's own copy: Lossless Scaling is a paid app, nothing of it comes with this one)
+            note(a, t(a, "Own Lossless Scaling? Import its Lossless.dll (in the program's folder) to use its frame generation here."));
+            LinearLayout lr = new LinearLayout(a); body.addView(lr);
+            button(a, lr, t(a, "Import Lossless.dll"), false, () -> pick(a, Intent.ACTION_OPEN_DOCUMENT, null, REQ_LSFG)); }
+        // HD textures: the player's own retexture mods (Mods), on Auto only on phones with the memory for them (GameSettings.profile, android_main.c mod_root);
+        //   offered once such a mod is in the mods folder
+        if (GameSettings.hasTexturePack(a)) {
+            boolean hdAuto = GameSettings.profile(a)[8].equals("on");
+            choice(a, "DM_HD_TEXTURES", t(a, "HD textures"), new String[][] {
+                { "", t(a, "Auto"), hdAuto ? t(a, "Auto: on for this phone") : t(a, "Auto: off for this phone (HD texture mods need 12 GB of memory)") },
+                { "on", t(a, "On"), t(a, "On: your HD texture mods load (more memory, slower area loads)") },
+                { "off", t(a, "Off"), t(a, "Off: the game's own textures (your HD texture mods stay installed)") } });
+        }
         heading(a, t(a, "Overlay"));
         choice(a, "DM_PERF_OVERLAY", t(a, "Performance overlay"), new String[][] { { "", t(a, "Off"), "" }, { "on", t(a, "On"), t(a, "On: fps, temperature, GPU, memory, battery") } });
     }
@@ -247,8 +277,11 @@ public final class GameMenu {
         note(a, t(a, "This phone: %s", p[1]));
         heading(a, t(a, "Speed"));
         String g = t(a, p[2].equals("high") ? "High" : p[2].equals("auto") ? "Adaptive" : "Low");
-        choice(a, "DM_GRAPHICS", t(a, "Graphics"), new String[][] { { "", t(a, "Auto"), t(a, "Auto: this phone gets %s", g) }, { "high", t(a, "High"), t(a, "High: TV mode, 1080p, full effects") },
-            { "low", t(a, "Low"), t(a, "Low: handheld mode, 720p, lighter") }, { "auto", t(a, "Adaptive"), t(a, "Adaptive: High, Low while the phone is hot") } });
+        String[][] gfx = { { "", t(a, "Auto"), t(a, "Auto: this phone gets %s", g) }, { "high", t(a, "High"), t(a, "High: TV mode, 1080p, full effects") },
+            { "low", t(a, "Low"), t(a, "Low: handheld mode, 720p, lighter") }, { "auto", t(a, "Adaptive"), t(a, "Adaptive: High, a lighter picture while the phone is hot or slow") },
+            // Lowest: handheld mode with the game's 3D render scale capped (Pokémon Sword / Shield: the engine's hle_resscale.c; Scarlet / Violet have no such scale)
+            { "lowest", t(a, "Lowest"), t(a, "Lowest: handheld mode, 3D at 960x540, coolest") } };
+        choice(a, "DM_GRAPHICS", t(a, "Graphics"), GameSettings.paldea(a) ? java.util.Arrays.copyOf(gfx, 4) : gfx);
         if (GameSettings.has60(a)) choice(a, "DM_FPS_TARGET", t(a, "Frame rate"), new String[][] { { "", t(a, "Auto"), t(a, "Auto: this phone gets %s fps", p[5]) },
             { "30", "30 fps", t(a, "30 fps, as the game is made") }, { "60", "60 fps", GameSettings.paldea(a) ? t(a, "Up to 60 fps: faster where the phone can, game speed stays right (Fl4sh's Dynamic FPS mod)")
                                                                                                : t(a, "60 fps: smoother; drops to 720p when needed to hold 60 (with Graphics on Auto or Adaptive)") } });
@@ -266,6 +299,12 @@ public final class GameMenu {
         choice(a, "DM_RUMBLE", t(a, "Rumble"), new String[][] { { "", t(a, "On"), t(a, "On: the controller's motor, else the phone's") }, { "pad", t(a, "Controllers only"), "" },
                                                                  { "off", t(a, "Off"), "" } });
         heading(a, t(a, "Touch controls"));
+        // L3 / R3 (pressing the sticks, touch_ui.c): off by default, Sword and Shield hardly use them (the left stick whistles in the Wild Area)
+        choice(a, "DM_TOUCH_L3R3", t(a, "L3 / R3 buttons"), new String[][] { { "", t(a, "Off"), t(a, "Off: no L3 / R3 on screen (a controller's stick buttons still work)") },
+                                                                             { "on", t(a, "On"), t(a, "On: L3 and R3 above the sticks (move them with Move the touch controls)") } });
+        // the short click when a touch button is pressed (touch_ui.c): by default it goes with Rumble, so Rumble Off silences the phone entirely (#114)
+        choice(a, "DM_TOUCH_HAPTIC", t(a, "Vibrate on press"), new String[][] { { "", t(a, "Like rumble"), t(a, "Like rumble: off when Rumble is Off") },
+                                                                                { "on", t(a, "On"), "" }, { "off", t(a, "Off"), "" } });
         slider(a, t(a, "Opacity"), "DM_TOUCH_OPACITY", 20, 100, 100, v -> v + " %");
         slider(a, t(a, "Fade after"), "DM_TOUCH_FADE", 0, 10, 3, v -> v == 0 ? t(a, "never fade") : t(a, "%d s without a touch", v));
         action(a, t(a, "Move the touch controls"), t(a, "Drag a control to move it, pinch to resize, double-tap to hide. Hold − for 2 s to save (hold + to reset)."), () -> {
@@ -414,6 +453,47 @@ public final class GameMenu {
             GameSettings.set(a, "DM_RELAY", sv); GameSettings.set(a, "DM_RELAY_ROOM", cd.replaceAll("\\s+", "")); RESTART.add("DM_RELAY_ROOM"); go("online"); });
         if (!room.isEmpty()) button(a, r, t(a, "Leave room"), false, () -> { GameSettings.set(a, "DM_RELAY_ROOM", ""); RESTART.add("DM_RELAY_ROOM"); go("online"); });
     }
+    // About: whether this copy is an official build (BuildSigner: signed with the release key), the credits, and the licences the APK carries (assets/licenses,
+    //   build_apk.py). The app is GPL-3.0-or-later (its older code also MIT): its copyright and licence notice must stay with every copy, so a repack that strips this page breaks the licence
+    private static String asset(Activity a, String name) {
+        try (java.io.InputStream in = a.getAssets().open(name)) {
+            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(); byte[] b = new byte[8192]; for (int n; (n = in.read(b)) > 0; ) o.write(b, 0, n); return o.toString("UTF-8");
+        } catch (Exception e) { return ""; }
+    }
+    private static void reveal(Activity a, LinearLayout c, String label, String full) {   // a licence's text, folded until tapped
+        TextView txt = text(a, full, 11, SUB, false); txt.setTypeface(Typeface.MONOSPACE); txt.setTextIsSelectable(true); txt.setVisibility(View.GONE);
+        TextView b = text(a, label, 13, accent(a), true); b.setPadding(0, dp(a, 8), 0, dp(a, 2));
+        b.setOnClickListener(v -> txt.setVisibility(txt.getVisibility() == View.GONE ? View.VISIBLE : View.GONE));
+        c.addView(b); c.addView(txt);
+    }
+    private static void about(Activity a) {
+        String[] app = GameSettings.app(a), sg = BuildSigner.digests(a); boolean official = BuildSigner.official(sg);
+        String ver = ""; try { ver = a.getPackageManager().getPackageInfo(a.getPackageName(), 0).versionName; } catch (Exception e) { }
+        String dl = "https://" + app[1] + "/releases";
+        heading(a, app[0] + (ver == null || ver.isEmpty() ? "" : " v" + ver));
+        LinearLayout c = card(a); titleRow(a, c, official ? t(a, "Official build") : t(a, "Unofficial build"), null);
+        c.addView(text(a, official ? t(a, "Signed with the %s release key.", app[0])
+                                   : t(a, "This copy was not signed by the %s project (signer %s). It may have been changed.", app[0], sg.length > 0 && sg[0].length() >= 16 ? sg[0].substring(0, 16) : "?"),
+                       13, SUB, false));
+        TextView link = text(a, t(a, "Official downloads: %s", dl), 13, accent(a), false); link.setPadding(0, dp(a, 6), 0, 0);
+        link.setOnClickListener(v -> { try { a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(dl))); } catch (Exception e) { } });
+        c.addView(link);
+        // the credits: the copyright lines of the app's licence, then the licence itself
+        String own = asset(a, "licenses/LICENSE.txt"); StringBuilder who = new StringBuilder();
+        for (String l : own.split("\n")) { String s_ = l.trim();   // (not the GPL text's own copyright line, and each holder once: NOTICE and LICENSE-MIT both name them)
+            if (s_.startsWith("Copyright") && !s_.contains("Free Software Foundation") && who.indexOf(s_) < 0) who.append(s_).append('\n'); }
+        if (who.length() == 0) who.append("Copyright (c) 2026 jhaizhou (d2r-mobile, nxnative)\nCopyright (c) 2026 the Galar Native (formerly PKShield Android) contributors\n");
+        heading(a, t(a, "Credits"));
+        LinearLayout cc = card(a); cc.addView(text(a, who.toString().trim(), 14, TEXT, false));
+        TextView mit = text(a, t(a, "Free software under the GNU GPL, version 3 or later (older parts also MIT). This notice must stay with every copy, and the source of every release is public."), 13, SUB, false); mit.setPadding(0, dp(a, 6), 0, 0); cc.addView(mit);
+        if (!own.isEmpty()) reveal(a, cc, t(a, "Show the license"), own);
+        // the third-party code and fonts (licenses/index.tsv: file, name, what it is)
+        heading(a, t(a, "Third-party code"));
+        for (String row : asset(a, "licenses/index.tsv").split("\n")) {
+            String[] f = row.split("\t"); if (f.length < 3 || f[0].equals("LICENSE.txt")) continue;
+            LinearLayout tc = card(a); titleRow(a, tc, f[1], null); tc.addView(text(a, f[2], 13, SUB, false)); reveal(a, tc, t(a, "Show the license"), asset(a, "licenses/" + f[0]));
+        }
+    }
     private static void system(Activity a) {
         heading(a, t(a, "Graphics driver"));
         action(a, t(a, "Graphics driver"), DriverPackages.label(DriverPackages.current(a)), () -> go("driver"));
@@ -423,6 +503,11 @@ public final class GameMenu {
         heading(a, t(a, "Background"));
         choice(a, "DM_BACKGROUND", t(a, "Leaving the game"), new String[][] { { "", t(a, "Keep playing"), t(a, "Keep playing: the game and its sound go on in the background") },
             { "off", t(a, "Pause"), t(a, "Pause: the game stops while it is not on screen") } });
+        // the replay on its own thread (hle_nvn.c DM_NVN_ASYNC): the game's thread hands each frame's graphics work over instead of translating it itself (about a quarter
+        //   of a frame on a slow CPU, #99). Off by default until players have run it on many phones
+        heading(a, t(a, "Performance"));
+        choice(a, "DM_NVN_ASYNC", t(a, "Faster rendering (experimental)"), new String[][] { { "", t(a, "Off"), "" },
+            { "1", t(a, "On"), t(a, "On: the graphics work runs on its own thread, next to the game's. Not tested on every phone yet: if the game misbehaves, turn it off and tell us on GitHub") } });
         // a frame capture for a bug report (nvn_vk.c, Frame capture): the engine reads capture.req (frames to wait, so the menu can be closed first) and writes the ZIP
         heading(a, t(a, "Bug reports"));
         action(a, t(a, "Capture a frame"), t(a, "Close this menu within 3 seconds and stay where the problem shows: the next frame is saved, step by step, as pictures and notes in Download (a ZIP ending in frame-capture.zip). Attach it to your issue."),
@@ -437,6 +522,8 @@ public final class GameMenu {
                 { "1", t(a, "On"), t(a, "On: each draw's uniform data is copied when it is recorded, instead of the GPU reading the game's memory directly") } });
             choice(a, "DM_VK_FLOAT_CONTROLS", t(a, "Exact infinities in shaders"), new String[][] { { "", t(a, "Auto"), t(a, "Auto: on with ARM's driver (v0.52)") },
                 { "0", t(a, "Off"), t(a, "Off: the shaders as before v0.52") } });
+            choice(a, "DM_VK_NAN_MINMAX", t(a, "Min / max as on the Switch"), new String[][] { { "", t(a, "Auto"), t(a, "Auto: on with ARM's driver (v0.57)") },
+                { "0", t(a, "Off"), t(a, "Off: the shaders as before v0.57") } });
             choice(a, "DM_VK_NO_PASS_MERGE", t(a, "Merge render passes"), new String[][] { { "", t(a, "On"), "" },
                 { "1", t(a, "Off"), t(a, "Off: every render target change starts a new pass") } });
         }
@@ -469,7 +556,7 @@ public final class GameMenu {
     }
 
     // ---------- files: save data out and in, mods and drivers in (the system file picker; GameActivity.onActivityResult hands the answer here) ----------
-    static final int REQ_EXPORT = 101, REQ_IMPORT = 102, REQ_MOD = 103, REQ_DRIVER = 104;
+    static final int REQ_EXPORT = 101, REQ_IMPORT = 102, REQ_MOD = 103, REQ_DRIVER = 104, REQ_LSFG = 105;
     private static void pick(Activity a, String action, String name, int req) {
         // (to open, any file: ZIPs saved by browsers and chat apps are often typed otherwise, and the picker greyed them out; a save ZIP is checked when read)
         Intent i = new Intent(action); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType(Intent.ACTION_OPEN_DOCUMENT.equals(action) ? "*/*" : "application/zip");
@@ -477,13 +564,19 @@ public final class GameMenu {
         a.startActivityForResult(i, req);
     }
     static boolean onResult(Activity a, int req, int res, Intent data) {
-        if (req != REQ_EXPORT && req != REQ_IMPORT && req != REQ_MOD && req != REQ_DRIVER) return false;
+        if (req != REQ_EXPORT && req != REQ_IMPORT && req != REQ_MOD && req != REQ_DRIVER && req != REQ_LSFG) return false;
         Uri u = res == Activity.RESULT_OK && data != null ? data.getData() : null; if (u == null) return true;
         File files = GameSettings.dir(a);
         new Thread(() -> {
             String msg;
             try {
                 if (req == REQ_DRIVER) msg = DriverPackages.install(a, u, displayName(a, u));
+                else if (req == REQ_LSFG) {   // the DLL read whole (about 3 MB), its shaders converted into files/lsfg (android_main.c DM_LSFG_DIR)
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    try (InputStream in = a.getContentResolver().openInputStream(u)) { byte[] b = new byte[1 << 16]; int k; long tot = 0;
+                        while ((k = in.read(b)) > 0) { bo.write(b, 0, k); if ((tot += k) > (64L << 20)) throw new IOException("the file is too large for Lossless.dll"); } }
+                    String why = nativeLsfgImport(bo.toByteArray(), new File(GameSettings.root(a), "lsfg").getPath());
+                    msg = why == null ? t(a, "Lossless Scaling imported. Choose it under Frame generation.") : t(a, "Could not import Lossless Scaling: %s", why); }
                 else if (req == REQ_EXPORT) {
                     try (OutputStream o = a.getContentResolver().openOutputStream(u, "wt"); ZipOutputStream z = new ZipOutputStream(o)) {
                         File save = new File(files, "save").getCanonicalFile(); int n = zipTree(save, save, z); msg = t(a, "Exported %d save file(s).", n); }
@@ -503,7 +596,7 @@ public final class GameMenu {
             final String m = msg;
             a.runOnUiThread(() -> {   // (the answer in the panel's status line, on the page it belongs to)
                 if (dlg == null) open(a, null);
-                if (req == REQ_MOD) { RESTART.add("mods"); go("mods"); } else if (req == REQ_DRIVER) go("driver"); else go("saves");
+                if (req == REQ_MOD) { RESTART.add("mods"); go("mods"); } else if (req == REQ_DRIVER) go("driver"); else if (req == REQ_LSFG) redraw(); else go("saves");
                 say(m);
             });
         }).start();
